@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package holoprojector;
+
+message LEDCommand {
+  uint32 r = 1;
+  uint32 g = 2;
+  uint32 b = 3;
+  uint32 brightness = 4;
+}
+
+message HoloprojectorCommand {
+  float servo1_angle = 1;
+  float servo2_angle = 2;
+  repeated LEDCommand led_commands = 3;
+}
