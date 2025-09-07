@@ -3,6 +3,8 @@
 
 #include <random>
 
+#include "interfaces/msg/holoprojector_state.hpp"
+
 #include "SerialInterface.hpp"
 #include "holoprojector.pb.h"
 
@@ -21,13 +23,22 @@ public:
         timer10ms_ = this->create_wall_timer(
             10ms, std::bind(&HoloprojectorNode::task_callback_10ms, this));
         
-        auto topic_callback = [this](const std_msgs::msg::String::UniquePtr msg) -> void
+
+        rclcpp::QoS qos(rclcpp::KeepLast(10));
+        qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
+        
+        auto topic_callback = [this](const interfaces::msg::HoloprojectorState msg) -> void
         {
-            RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+            RCLCPP_INFO(this->get_logger(), "Received HoloprojectorState message");
+            set_servo_angle(1, msg.servo1_angle);
+            set_servo_angle(2, msg.servo2_angle);
+            fill_color(msg.led_r, msg.led_g, msg.led_b);
+            apply();
         };
 
-        auto subscription = this->create_subscription<std_msgs::msg::String>(
-            "debug", 10, topic_callback);
+        subscription_ = this->create_subscription<interfaces::msg::HoloprojectorState>(
+            "debug", qos, topic_callback);
         
         if (serial_interface_.open())
         {
@@ -70,6 +81,14 @@ private:
         }
     }
 
+    void fill_color(uint8_t r, uint8_t g, uint8_t b)
+    {
+        for (int i = 0; i < NEOPIXEL_COUNT; ++i)
+        {
+            set_led(i, r, g, b);
+        }
+    }
+
     void set_servo_angle(uint8_t servo_index, float angle)
     {
         if (servo_index == 1)
@@ -82,12 +101,51 @@ private:
         }
     }
 
+    void send_(void)
+    {
+        auto crc16_ccitt = [](const uint8_t* data, size_t len) -> uint16_t {
+            uint16_t crc = 0xFFFF;
+            for (size_t i = 0; i < len; ++i) {
+                crc ^= (uint16_t)data[i] << 8;
+                for (int j = 0; j < 8; ++j) {
+                    if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
+                    else crc <<= 1;
+                }
+            }
+            return crc;
+        };
+
+        std::string out;
+        if (cmd_.SerializeToString(&out))
+        {
+            const uint8_t preamble[2] = {0xAA, 0x55};
+            uint16_t len = static_cast<uint16_t>(out.size());
+            uint8_t len_bytes[2] = {static_cast<uint8_t>(len & 0xFF), static_cast<uint8_t>((len >> 8) & 0xFF)};
+            uint16_t crc = crc16_ccitt(reinterpret_cast<const uint8_t*>(out.data()), out.size());
+            uint8_t crc_bytes[2] = {static_cast<uint8_t>(crc & 0xFF), static_cast<uint8_t>((crc >> 8) & 0xFF)};
+
+            serial_interface_.writeData(preamble, sizeof(preamble));
+            serial_interface_.writeData(len_bytes, sizeof(len_bytes));
+            if (len > 0) {
+                serial_interface_.writeData(reinterpret_cast<const uint8_t*>(out.data()), out.size());
+            }
+            serial_interface_.writeData(crc_bytes, sizeof(crc_bytes));
+
+            RCLCPP_INFO(this->get_logger(), "Sent framed command, payload: %zu bytes", out.size());
+        }
+        else
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to serialize command.");
+        }
+    }
+
     void apply(void)
     {
         // Apply servo angles and LED colors
         RCLCPP_INFO(this->get_logger(), "Applying servo1: %.2f, servo2: %.2f", servo1_angle_, servo2_angle_);
         cmd_.set_servo1_angle(servo1_angle_);
         cmd_.set_servo2_angle(servo2_angle_);
+        cmd_.clear_led_commands();
         for (int i = 0; i < NEOPIXEL_COUNT; ++i)
         {
             RCLCPP_INFO(this->get_logger(), "LED %d - R: %d, G: %d, B: %d", i, led_cmds_[i].r(), led_cmds_[i].g(), led_cmds_[i].b());
@@ -97,6 +155,7 @@ private:
             led_cmd->set_b(led_cmds_[i].b());
             led_cmd->set_brightness(led_cmds_[i].brightness());
         }
+        send_();
     }
 
     rclcpp::TimerBase::SharedPtr timer_;
@@ -108,6 +167,7 @@ private:
     holoprojector::LEDCommand led_cmds_[NEOPIXEL_COUNT];
     float servo1_angle_ = 0.0f;
     float servo2_angle_ = 0.0f;
+    rclcpp::Subscription<interfaces::msg::HoloprojectorState>::SharedPtr subscription_;
 
 };
 

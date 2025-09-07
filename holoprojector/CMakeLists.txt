@@ -10,6 +10,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Protobuf REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(interfaces REQUIRED)
 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/holoprojector.proto)
 add_library(holoprojector_proto ${PROTO_SRCS} ${PROTO_HDRS})
@@ -22,7 +24,7 @@ target_include_directories(holoprojector_node PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(holoprojector_node holoprojector_proto)
-ament_target_dependencies(holoprojector_node rclcpp std_msgs)
+ament_target_dependencies(holoprojector_node rclcpp std_msgs interfaces)
 
 install(TARGETS
   holoprojector_node

@@ -1,0 +1,6 @@
+{
+    "cmake.sourceDirectory": "/home/eric/ros2_ws/holoprojector",
+    "files.associations": {
+        "random": "cpp"
+    }
+}
