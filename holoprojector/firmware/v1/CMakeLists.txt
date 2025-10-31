@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.13)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+include(pico_sdk_import.cmake)
+
+project(holoprojector_pico_v1 C CXX ASM)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+pico_sdk_init()
+
+
+add_executable(holoprojector_pico_v1
+    src/main.c
+    src/rs485.c
+    src/r2bus.c
+    src/ws2812.c
+)
+
+pico_generate_pio_header(holoprojector_pico_v1 ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+
+target_link_libraries(holoprojector_pico_v1
+    pico_stdlib
+    hardware_pio
+    hardware_dma
+)
+
+target_include_directories(holoprojector_pico_v1
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+pico_set_linker_script(holoprojector_pico_v1 ${CMAKE_CURRENT_LIST_DIR}/linker.ld)
+
+pico_enable_stdio_usb(holoprojector_pico_v1 1)
+pico_enable_stdio_uart(holoprojector_pico_v1 0)
+
+pico_add_extra_outputs(holoprojector_pico_v1)
+
+# Copy the compile_commands.json to the root directory
+add_custom_command(TARGET holoprojector_pico_v1 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_BINARY_DIR}/compile_commands.json
+    ${CMAKE_SOURCE_DIR}/compile_commands.json
+)
