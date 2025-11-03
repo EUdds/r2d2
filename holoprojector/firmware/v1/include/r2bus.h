@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "r2bus.pb.h"
 #include "rs485.h"
 
 #define R2BUS_HEADER 0xAA55u
@@ -14,12 +15,13 @@
 #define R2BUS_HOST_ID 0x00u
 
 typedef enum {
-    R2BUS_MSG_ECU_RESET = 0x01,
-    R2BUS_MSG_PING = 0x02,
-    R2BUS_MSG_PONG = 0x03,
-    R2BUS_MSG_HEARTBEAT = 0x04,
-    R2BUS_MSG_PSI_COLOR_REQ = 0x05,
-    R2BUS_MSG_ACK = 0x7F,
+    R2BUS_MSG_ECU_RESET = r2bus_MessageId_MESSAGE_ID_ECU_RESET,
+    R2BUS_MSG_PING = r2bus_MessageId_MESSAGE_ID_PING,
+    R2BUS_MSG_PONG = r2bus_MessageId_MESSAGE_ID_PONG,
+    R2BUS_MSG_HEARTBEAT = r2bus_MessageId_MESSAGE_ID_HEARTBEAT,
+    R2BUS_MSG_PSI_COLOR_REQ = r2bus_MessageId_MESSAGE_ID_PSI_COLOR_REQ,
+    R2BUS_MSG_SERVO_MOVE_CMD = r2bus_MessageId_MESSAGE_ID_SERVO_MOVE_CMD,
+    R2BUS_MSG_ACK = r2bus_MessageId_MESSAGE_ID_ACK,
 } r2bus_msg_id_E;
 
 typedef enum {

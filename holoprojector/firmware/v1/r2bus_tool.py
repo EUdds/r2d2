@@ -11,12 +11,28 @@ import argparse
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Optional
 
 try:
     import serial  # type: ignore
 except ImportError:
     sys.exit("PySerial is required: pip install pyserial")
+
+try:
+    from google.protobuf import message as _pb_message
+    from google.protobuf.message import DecodeError
+except ImportError:
+    sys.exit("Google protobuf is required: pip install protobuf")
+
+PROTO_DIR = Path(__file__).resolve().with_name("proto")
+if PROTO_DIR.exists():
+    sys.path.insert(0, str(PROTO_DIR))
+
+try:
+    import r2bus_pb2
+except ImportError as exc:  # pragma: no cover - import dependency hint
+    sys.exit(f"Unable to import R2 bus protobuf module: {exc}")
 
 SYNC0 = 0x55
 SYNC1 = 0xAA
@@ -26,23 +42,58 @@ CRC_POLY = 0x1021
 HOST_ID = 0x00
 BROADCAST_ID = 0xFF
 
-MSG_ECU_RESET = 0x01
-MSG_PING = 0x02
-MSG_PONG = 0x03
-MSG_HEARTBEAT = 0x04
-MSG_ACK = 0x7F
+MessageId = r2bus_pb2.MessageId
 
-MSG_NAMES = {
-    MSG_ECU_RESET: "ECU_RESET",
-    MSG_PING: "PING",
-    MSG_PONG: "PONG",
-    MSG_HEARTBEAT: "HEARTBEAT",
-    MSG_ACK: "ACK",
+MSG_ECU_RESET = MessageId.MESSAGE_ID_ECU_RESET
+MSG_PING = MessageId.MESSAGE_ID_PING
+MSG_PONG = MessageId.MESSAGE_ID_PONG
+MSG_HEARTBEAT = MessageId.MESSAGE_ID_HEARTBEAT
+MSG_PSI_COLOR_REQ = MessageId.MESSAGE_ID_PSI_COLOR_REQ
+MSG_SERVO_MOVE_CMD = MessageId.MESSAGE_ID_SERVO_MOVE_CMD
+MSG_ACK = MessageId.MESSAGE_ID_ACK
+
+PROTO_MESSAGE_BY_ID = {
+    MSG_ECU_RESET: r2bus_pb2.Empty,
+    MSG_PING: r2bus_pb2.Ping,
+    MSG_PONG: r2bus_pb2.Pong,
+    MSG_HEARTBEAT: r2bus_pb2.Heartbeat,
+    MSG_PSI_COLOR_REQ: r2bus_pb2.PsiColorRequest,
+    MSG_SERVO_MOVE_CMD: r2bus_pb2.ServoMoveCommand,
+    MSG_ACK: r2bus_pb2.Ack,
 }
 
 
 def msg_name(msg_id: int) -> str:
-    return MSG_NAMES.get(msg_id, f"0x{msg_id:02X}")
+    try:
+        return r2bus_pb2.MessageId.Name(msg_id)
+    except ValueError:
+        return f"0x{msg_id:02X}"
+
+
+def decode_proto(msg_id: int, payload: bytes) -> Optional[_pb_message.Message]:
+    message_cls = PROTO_MESSAGE_BY_ID.get(msg_id)
+    if not message_cls:
+        return None
+    message = message_cls()
+    try:
+        message.ParseFromString(payload)
+    except DecodeError:
+        return None
+    return message
+
+
+def encode_payload_for_send(msg_id: int, payload: bytes) -> bytes:
+    if msg_id == MSG_PING:
+        message = r2bus_pb2.Ping()
+        message.payload = payload
+        return message.SerializeToString()
+    if msg_id == MSG_PONG:
+        message = r2bus_pb2.Pong()
+        message.payload = payload
+        return message.SerializeToString()
+    if msg_id == MSG_ECU_RESET:
+        return r2bus_pb2.Empty().SerializeToString()
+    return payload
 
 
 def crc16_ccitt(data: Iterable[int], seed: int = CRC_SEED) -> int:
@@ -66,6 +117,7 @@ class Frame:
     length: int
     payload: bytes
     crc: int
+    proto: Optional[_pb_message.Message] = None
 
 
 class R2BusSerial:
@@ -112,7 +164,15 @@ class R2BusSerial:
             del buf[:frame_len]
             if crc_rx != crc_calc:
                 continue
-            return Frame(dest, src, msg_id, length, payload, crc_rx)
+            return Frame(
+                dest=dest,
+                src=src,
+                msg_id=msg_id,
+                length=length,
+                payload=payload,
+                crc=crc_rx,
+                proto=decode_proto(msg_id, payload),
+            )
 
     def read_frame(self, timeout: Optional[float]) -> Optional[Frame]:
         deadline = None if timeout is None else time.monotonic() + timeout
@@ -152,13 +212,38 @@ def format_payload(data: bytes) -> str:
     return f"{hex_part} | {printable}"
 
 
+def format_frame_details(frame: Frame) -> str:
+    proto = frame.proto
+    if proto is None:
+        return f"payload={format_payload(frame.payload)}"
+    if frame.msg_id == MSG_ACK and isinstance(proto, r2bus_pb2.Ack):
+        status = r2bus_pb2.Status.Name(proto.status)
+        original = msg_name(proto.original_msg)
+        return f"ack(status={status}, original={original})"
+    if frame.msg_id in (MSG_PING, MSG_PONG) and hasattr(proto, "payload"):
+        return f"payload={format_payload(proto.payload)}"
+    if frame.msg_id == MSG_HEARTBEAT and isinstance(proto, r2bus_pb2.Heartbeat):
+        return f"heartbeat(uptime_ms={proto.uptime_ms})"
+    if frame.msg_id == MSG_PSI_COLOR_REQ and isinstance(proto, r2bus_pb2.PsiColorRequest):
+        return f"psi_color(r={proto.red}, g={proto.green}, b={proto.blue})"
+    if frame.msg_id == MSG_SERVO_MOVE_CMD and isinstance(proto, r2bus_pb2.ServoMoveCommand):
+        return (
+            "servo_move(servo={servo}, pos={pos:.1f}, duration_ms={dur})".format(
+                servo=proto.servo,
+                pos=proto.position_deg,
+                dur=proto.duration_ms,
+            )
+        )
+    return f"payload={format_payload(frame.payload)}"
+
+
 def format_frame(frame: Frame) -> str:
     timestamp = time.strftime("%H:%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
     name = msg_name(frame.msg_id)
     return (
         f"{timestamp} "
         f"{frame.src:02X} -> {frame.dest:02X} "
-        f"{name} len={frame.length} payload={format_payload(frame.payload)}"
+        f"{name} len={frame.length} {format_frame_details(frame)}"
     )
 
 
@@ -205,11 +290,15 @@ def wait_for_ack(bus: R2BusSerial, dest: int, msg_id: int, timeout: float) -> bo
         if not frame:
             break
         print(format_frame(frame))
-        if frame.msg_id == MSG_ACK and frame.src == dest and frame.length >= 2:
-            status = frame.payload[0]
-            original = frame.payload[1]
-            if original == msg_id:
-                return status == 0
+        if frame.msg_id == MSG_ACK and frame.src == dest:
+            if isinstance(frame.proto, r2bus_pb2.Ack):
+                if frame.proto.original_msg == msg_id:
+                    return frame.proto.status == r2bus_pb2.STATUS_OK
+            elif frame.length >= 2:
+                status = frame.payload[0]
+                original = frame.payload[1]
+                if original == msg_id:
+                    return status == 0
     return False
 
 
@@ -245,7 +334,8 @@ def send_command(args: argparse.Namespace) -> int:
 
     bus = R2BusSerial(args.port, args.baud, args.timeout)
     try:
-        bus.send_frame(args.dest, args.msg, payload, src=args.src)
+        encoded = encode_payload_for_send(args.msg, payload)
+        bus.send_frame(args.dest, args.msg, encoded, src=args.src)
         print(
             f"Sent {msg_name(args.msg)} to {args.dest:02X} "
             f"(len={len(payload)} payload={format_payload(payload)})"
@@ -271,7 +361,8 @@ def reset_command(args: argparse.Namespace) -> int:
 
     bus = R2BusSerial(args.port, args.baud, args.timeout)
     try:
-        bus.send_frame(args.dest, args.msg, b"", src=args.src)
+        encoded = encode_payload_for_send(args.msg, b"")
+        bus.send_frame(args.dest, args.msg, encoded, src=args.src)
         print(f"Sent ECU_RESET to {args.dest:02X}")
         if wait_ack and args.dest != BROADCAST_ID:
             ok = wait_for_ack(bus, args.dest, args.msg, args.ack_timeout)
@@ -297,7 +388,8 @@ def ping_command(args: argparse.Namespace) -> int:
 
     bus = R2BusSerial(args.port, args.baud, args.timeout)
     try:
-        bus.send_frame(args.dest, args.msg, payload, src=args.src)
+        encoded = encode_payload_for_send(args.msg, payload)
+        bus.send_frame(args.dest, args.msg, encoded, src=args.src)
         print(
             f"Sent PING to {args.dest:02X} "
             f"(len={len(payload)} payload={format_payload(payload)})"

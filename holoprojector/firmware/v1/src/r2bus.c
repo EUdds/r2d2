@@ -8,7 +8,12 @@
 
 #include <string.h>
 
+#include "pb_decode.h"
+#include "pb_encode.h"
 #include "pico/platform.h"
+
+#include "r2bus.pb.h"
+#include "r2bus_proto.h"
 
 #define R2BUS_RX_BUFFER_SIZE 64
 #define R2BUS_CRC_SEED 0xFFFFu
@@ -36,6 +41,16 @@ static void r2bus_reset_rx(r2bus_ctx_t *ctx) {
     ctx->rx.rx_crc = 0;
 }
 
+static r2bus_Status r2bus_status_to_proto(r2bus_status_E status) {
+    switch (status) {
+        case R2BUS_STATUS_ERROR:
+            return r2bus_Status_STATUS_ERROR;
+        case R2BUS_STATUS_OK:
+        default:
+            return r2bus_Status_STATUS_OK;
+    }
+}
+
 static void r2bus_send_ack(r2bus_ctx_t *ctx,
                            uint8_t dest_id,
                            r2bus_status_E status,
@@ -46,8 +61,10 @@ static void r2bus_send_ack(r2bus_ctx_t *ctx,
     if (dest_id == R2BUS_BROADCAST_ID) {
         return;  // No ACKs for broadcast frames
     }
-    const uint8_t payload[2] = { (uint8_t)status, (uint8_t)original_msg };
-    (void)r2bus_send(ctx, dest_id, R2BUS_MSG_ACK, payload, sizeof(payload));
+    r2bus_Ack ack = r2bus_Ack_init_default;
+    ack.status = r2bus_status_to_proto(status);
+    ack.original_msg = (r2bus_MessageId)original_msg;
+    (void)r2bus_send_proto(ctx, dest_id, R2BUS_MSG_ACK, r2bus_Ack_fields, &ack);
 }
 
 static void r2bus_process_payload(r2bus_ctx_t *ctx) {
@@ -72,11 +89,23 @@ static void r2bus_process_payload(r2bus_ctx_t *ctx) {
         case R2BUS_MSG_PING:
             // Respond directly to the caller
             if (packet->dest_id == ctx->node_id) {
-                (void)r2bus_send(ctx,
-                                 packet->src_id,
-                                 R2BUS_MSG_PONG,
-                                 packet->payload,
-                                 packet->length);
+                r2bus_Ping ping = r2bus_Ping_init_default;
+                if (!r2bus_decode_proto(packet, r2bus_Ping_fields, &ping)) {
+                    r2bus_send_ack(ctx, packet->src_id, R2BUS_STATUS_ERROR, packet->msg_id);
+                    break;
+                }
+                r2bus_Pong pong = r2bus_Pong_init_default;
+                if (ping.payload.size <= R2BUS_MAX_PROTO_PAYLOAD) {
+                    pong.payload.size = ping.payload.size;
+                    if (pong.payload.size > 0) {
+                        memcpy(pong.payload.bytes, ping.payload.bytes, pong.payload.size);
+                    }
+                }
+                (void)r2bus_send_proto(ctx,
+                                       packet->src_id,
+                                       R2BUS_MSG_PONG,
+                                       r2bus_Pong_fields,
+                                       &pong);
             }
             break;
         default:
@@ -217,4 +246,33 @@ bool r2bus_send(r2bus_ctx_t *ctx,
 
     rs485_write_blocking(ctx->bus, frame, index);
     return true;
+}
+
+bool r2bus_send_proto(r2bus_ctx_t *ctx,
+                      uint8_t dest_id,
+                      r2bus_msg_id_E msg_id,
+                      const pb_msgdesc_t *fields,
+                      const void *src_struct) {
+    if (!ctx || !fields || !src_struct) {
+        return false;
+    }
+    uint8_t buffer[R2BUS_MAX_DATA_LENGTH];
+    pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+    if (!pb_encode(&stream, fields, src_struct)) {
+        return false;
+    }
+    if (stream.bytes_written > R2BUS_MAX_DATA_LENGTH) {
+        return false;
+    }
+    return r2bus_send(ctx, dest_id, msg_id, buffer, (uint8_t)stream.bytes_written);
+}
+
+bool r2bus_decode_proto(const r2bus_packet_t *packet,
+                        const pb_msgdesc_t *fields,
+                        void *dst_struct) {
+    if (!packet || !fields || !dst_struct) {
+        return false;
+    }
+    pb_istream_t stream = pb_istream_from_buffer(packet->payload, packet->length);
+    return pb_decode(&stream, fields, dst_struct);
 }
