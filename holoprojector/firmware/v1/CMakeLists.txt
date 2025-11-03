@@ -10,25 +10,37 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs)
+
 
 add_executable(holoprojector_pico_v1
     src/main.c
     src/rs485.c
     src/r2bus.c
+    src/r2bus_receiver.c
     src/ws2812.c
+    src/pico_servo.c
+    proto/r2bus.pb.c
 )
 
 pico_generate_pio_header(holoprojector_pico_v1 ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+pico_generate_pio_header(holoprojector_pico_v1 ${CMAKE_CURRENT_LIST_DIR}/src/pico_servo.pio)
 
 target_link_libraries(holoprojector_pico_v1
     pico_stdlib
     hardware_pio
     hardware_dma
+    hardware_pwm
+    fixmath
+    nanopb
 )
 
 target_include_directories(holoprojector_pico_v1
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/proto
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/pico-libfixmath/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../holoprojector
 )
 
 pico_set_linker_script(holoprojector_pico_v1 ${CMAKE_CURRENT_LIST_DIR}/linker.ld)

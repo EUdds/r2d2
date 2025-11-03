@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package r2bus;
+
+enum Status {
+  STATUS_OK = 0;
+  STATUS_ERROR = 1;
+}
+
+enum MessageId {
+  MESSAGE_ID_UNKNOWN = 0;
+  MESSAGE_ID_ECU_RESET = 0x01;
+  MESSAGE_ID_PING = 0x02;
+  MESSAGE_ID_PONG = 0x03;
+  MESSAGE_ID_HEARTBEAT = 0x04;
+  MESSAGE_ID_PSI_COLOR_REQ = 0x05;
+  MESSAGE_ID_SERVO_MOVE_CMD = 0x06;
+  MESSAGE_ID_ACK = 0x7F;
+}
+
+message Ack {
+  Status status = 1;
+  MessageId original_msg = 2;
+}
+
+message Ping {
+  bytes payload = 1;
+}
+
+message Pong {
+  bytes payload = 1;
+}
+
+message Heartbeat {
+  uint32 uptime_ms = 1;
+}
+
+message PsiColorRequest {
+  uint32 red = 1;
+  uint32 green = 2;
+  uint32 blue = 3;
+}
+
+message ServoMoveCommand {
+  uint32 servo = 1;
+  float position_deg = 2;
+  uint32 duration_ms = 3;
+}
+
+message Empty {}

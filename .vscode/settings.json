@@ -1,6 +1,7 @@
 {
-    "cmake.sourceDirectory": "/home/eric/ros2_ws/holoprojector",
+    "cmake.sourceDirectory": "/home/eric/r2d2/holoprojector/firmware/v1",
     "files.associations": {
         "random": "cpp"
-    }
+    },
+    "clangd.path": "/usr/bin/clangd",
 }

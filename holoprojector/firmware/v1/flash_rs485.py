@@ -4,12 +4,28 @@ import struct
 import sys
 import time
 import zlib
+from pathlib import Path
+
 import tqdm
 
 try:
     import serial  # type: ignore
 except ImportError as exc:  # pragma: no cover - dependency hint
     sys.exit("PySerial is required: pip install pyserial")  # pragma: no cover
+
+try:
+    from google.protobuf.message import DecodeError
+except ImportError as exc:  # pragma: no cover - dependency hint
+    sys.exit("Google protobuf is required: pip install protobuf")  # pragma: no cover
+
+PROTO_DIR = Path(__file__).resolve().with_name("proto")
+if PROTO_DIR.exists():
+    sys.path.insert(0, str(PROTO_DIR))
+
+try:
+    import r2bus_pb2
+except ImportError as exc:  # pragma: no cover - dependency hint
+    sys.exit(f"Unable to import R2 bus protobuf module: {exc}")  # pragma: no cover
 
 SYNC0 = 0x55
 SYNC1 = 0xAA
@@ -39,8 +55,10 @@ STATUS_TEXT = {
 HEADER_STRUCT = struct.Struct("<BBBBII")  # sync0, sync1, cmd, version, length, crc
 INFO_STRUCT = struct.Struct("<IIIIII8s")
 
-R2BUS_MSG_ECU_RESET = 0x01
-R2BUS_MSG_ACK = 0x7F
+MessageId = r2bus_pb2.MessageId
+
+R2BUS_MSG_ECU_RESET = MessageId.MESSAGE_ID_ECU_RESET
+R2BUS_MSG_ACK = MessageId.MESSAGE_ID_ACK
 R2BUS_HOST_ID = 0x00
 R2BUS_BROADCAST_ID = 0xFF
 R2BUS_CRC_SEED = 0xFFFF
@@ -141,13 +159,17 @@ def request_application_reset(
                     msg_id == R2BUS_MSG_ACK
                     and src == node_id
                     and dest in (host_id & 0xFF, R2BUS_HOST_ID)
-                    and len(payload) >= 2
-                    and payload[1] == R2BUS_MSG_ECU_RESET
                 ):
-                    status = payload[0]
-                    if status == 0:
-                        return True
-                    raise BootloaderError(f"ECU reset rejected with status {status}")
+                    try:
+                        ack = r2bus_pb2.Ack()
+                        ack.ParseFromString(payload)
+                    except DecodeError:
+                        continue
+                    if ack.original_msg == R2BUS_MSG_ECU_RESET:
+                        if ack.status == r2bus_pb2.STATUS_OK:
+                            return True
+                        status_name = r2bus_pb2.Status.Name(ack.status)
+                        raise BootloaderError(f"ECU reset rejected with status {status_name}")
                 # Ignore unrelated frames and continue reading
                 continue
             if time.monotonic() >= deadline:
