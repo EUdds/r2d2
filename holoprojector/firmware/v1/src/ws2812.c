@@ -29,10 +29,35 @@ static const ws2812_config_t ws2812_config[NUM_STRIPS] = {
 };
 
 static ws2812_handle_t ws2812_handle[NUM_STRIPS] = {0};
+static bool g_ws2812_initialized = false;
+
+static inline ws2812_handle_t *ws2812_resolve_handle(ws2812_strip_E strip) {
+    if (!g_ws2812_initialized) {
+        return NULL;
+    }
+    if (strip >= NUM_STRIPS) {
+        return NULL;
+    }
+    return &ws2812_handle[strip];
+}
 
 void put_pixel(ws2812_strip_E strip, uint32_t pixel_grb) {
-    ws2812_handle_t* handle = &ws2812_handle[strip];
+    ws2812_handle_t* handle = ws2812_resolve_handle(strip);
+    if (!handle) {
+        return;
+    }
     pio_sm_put_blocking(handle->pio, handle->sm, pixel_grb << 8u);
+}
+
+void fill_pixels(ws2812_strip_E strip, uint32_t pixel_grb) {
+    ws2812_handle_t* handle = ws2812_resolve_handle(strip);
+    const ws2812_config_t* config = &ws2812_config[strip];
+    if (!handle || !config) {
+        return;
+    }
+    for (uint16_t i = 0; i < config->num_pixels; ++i) {
+        pio_sm_put_blocking(handle->pio, handle->sm, pixel_grb << 8u);
+    }
 }
 
 uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
@@ -105,5 +130,14 @@ ws2812_handle_t* init_ws2812(void)
         ws2812_handle[i].sm = sm;
     }
 
+    g_ws2812_initialized = true;
+
+    
+
+
     return (ws2812_handle_t*)ws2812_handle;
+}
+
+ws2812_handle_t* ws2812_get_handle(ws2812_strip_E strip) {
+    return ws2812_resolve_handle(strip);
 }

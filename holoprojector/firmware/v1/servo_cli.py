@@ -61,11 +61,11 @@ def move_command(args: argparse.Namespace) -> int:
             src=args.src,
         )
         print(
-            "Sent servo_move to 0x{dest:02X}: servo={servo} pos={pos:.2f} duration_ms={dur}".format(
+            "Sent servo_move to 0x{dest:02X}: servo={servo} pos={pos:.2f} pulse_override_us={pulse}".format(
                 dest=args.dest,
                 servo=command.servo,
                 pos=command.position_deg,
-                dur=command.duration_ms,
+                pulse=command.duration_ms if command.duration_ms else "none",
             )
         )
         if args.wait_ack and args.dest != r2bus_tool.BROADCAST_ID:
@@ -73,6 +73,94 @@ def move_command(args: argparse.Namespace) -> int:
                 bus,
                 dest=args.dest,
                 msg_id=r2bus_tool.MSG_SERVO_MOVE_CMD,
+                timeout=args.ack_timeout,
+            )
+            if ok:
+                print("ACK received")
+                return 0
+            print("No ACK received", file=sys.stderr)
+            return 1
+    finally:
+        bus.close()
+    return 0
+
+
+def pulse_command(args: argparse.Namespace) -> int:
+    if args.pulse_us == 0:
+        print("Error: pulse width must be greater than zero", file=sys.stderr)
+        return 2
+
+    command = r2bus_tool.r2bus_pb2.ServoMoveCommand()
+    command.servo = args.servo
+    command.position_deg = args.fallback_angle
+    command.duration_ms = args.pulse_us
+
+    bus = r2bus_tool.R2BusSerial(args.port, args.baud, args.timeout)
+    try:
+        payload = command.SerializeToString()
+        bus.send_frame(
+            args.dest,
+            r2bus_tool.MSG_SERVO_MOVE_CMD,
+            payload,
+            src=args.src,
+        )
+        print(
+            "Sent servo_pulse to 0x{dest:02X}: servo={servo} pulse_us={pulse} fallback_deg={deg:.2f}".format(
+                dest=args.dest,
+                servo=command.servo,
+                pulse=command.duration_ms,
+                deg=command.position_deg,
+            )
+        )
+        if args.wait_ack and args.dest != r2bus_tool.BROADCAST_ID:
+            ok = r2bus_tool.wait_for_ack(
+                bus,
+                dest=args.dest,
+                msg_id=r2bus_tool.MSG_SERVO_MOVE_CMD,
+                timeout=args.ack_timeout,
+            )
+            if ok:
+                print("ACK received")
+                return 0
+            print("No ACK received", file=sys.stderr)
+            return 1
+    finally:
+        bus.close()
+    return 0
+
+
+def home_command(args: argparse.Namespace) -> int:
+    if args.all and args.servo is not None:
+        print("Error: specify either --servo or --all, not both", file=sys.stderr)
+        return 2
+    if not args.all and args.servo is None:
+        print("Error: provide --servo when --all is not set", file=sys.stderr)
+        return 2
+
+    command = r2bus_tool.r2bus_pb2.ServoHomeCommand()
+    if args.all:
+        command.all = True
+        command.servo = 0
+    else:
+        command.all = False
+        command.servo = args.servo
+
+    bus = r2bus_tool.R2BusSerial(args.port, args.baud, args.timeout)
+    try:
+        payload = command.SerializeToString()
+        bus.send_frame(
+            args.dest,
+            r2bus_tool.MSG_SERVO_HOME_CMD,
+            payload,
+            src=args.src,
+        )
+        target = "all servos" if command.all else f"servo {command.servo}"
+        print(f"Sent servo_home to 0x{args.dest:02X}: target={target}")
+        if args.wait_ack and args.dest != r2bus_tool.BROADCAST_ID:
+            ok = r2bus_tool.wait_for_ack(
+                bus,
+                dest=args.dest,
+                msg_id=r2bus_tool.MSG_SERVO_HOME_CMD,
                 timeout=args.ack_timeout,
             )
             if ok:
@@ -112,7 +200,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--duration-ms",
         default=0,
         type=_parse_u32,
-        help="Move duration in milliseconds (default: %(default)s)",
+        help="Optional raw pulse override in microseconds (leave 0 to use angle mapping)",
     )
     move_p.add_argument(
         "--wait-ack",
@@ -126,6 +214,59 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds to wait for ACK when --wait-ack is used",
     )
     move_p.set_defaults(func=move_command)
+
+    pulse_p = sub.add_parser("pulse", help="Send a raw pulse width (microseconds)")
+    pulse_p.add_argument("dest", type=_parse_node_id, help="Destination node ID (e.g. 0x10)")
+    pulse_p.add_argument("--servo", required=True, type=_parse_servo, help="Servo channel index")
+    pulse_p.add_argument(
+        "--pulse-us",
+        required=True,
+        type=_parse_u32,
+        help="Target pulse width in microseconds (e.g. 1500)",
+    )
+    pulse_p.add_argument(
+        "--fallback-angle",
+        default=0.0,
+        type=float,
+        help="Angle to report in the command (ignored by firmware when --pulse-us is used)",
+    )
+    pulse_p.add_argument(
+        "--wait-ack",
+        action="store_true",
+        help="Wait for an ACK response from the destination",
+    )
+    pulse_p.add_argument(
+        "--ack-timeout",
+        default=1.0,
+        type=float,
+        help="Seconds to wait for ACK when --wait-ack is used",
+    )
+    pulse_p.set_defaults(func=pulse_command)
+
+    home_p = sub.add_parser("home", help="Return one or all servos to their home angles")
+    home_p.add_argument("dest", type=_parse_node_id, help="Destination node ID (e.g. 0x10)")
+    home_p.add_argument(
+        "--servo",
+        type=_parse_servo,
+        help="Servo channel index to home",
+    )
+    home_p.add_argument(
+        "--all",
+        action="store_true",
+        help="Home all servos on the destination",
+    )
+    home_p.add_argument(
+        "--wait-ack",
+        action="store_true",
+        help="Wait for an ACK response from the destination",
+    )
+    home_p.add_argument(
+        "--ack-timeout",
+        default=1.0,
+        type=float,
+        help="Seconds to wait for ACK when --wait-ack is used",
+    )
+    home_p.set_defaults(func=home_command)
 
     return parser
 

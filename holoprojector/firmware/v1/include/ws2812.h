@@ -28,3 +28,5 @@ typedef struct
 ws2812_handle_t* init_ws2812(void);
 void put_pixel(ws2812_strip_E strip, uint32_t pixel_grb);
 uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b);
+ws2812_handle_t* ws2812_get_handle(ws2812_strip_E strip);
+void fill_pixels(ws2812_strip_E strip, uint32_t pixel_grb);

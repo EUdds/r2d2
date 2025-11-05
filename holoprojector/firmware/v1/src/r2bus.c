@@ -18,6 +18,20 @@
 #define R2BUS_RX_BUFFER_SIZE 64
 #define R2BUS_CRC_SEED 0xFFFFu
 
+static r2bus_ctx_t g_r2bus_static_ctx;
+static r2bus_ctx_t *g_r2bus_active_ctx = &g_r2bus_static_ctx;
+static bool g_r2bus_ctx_initialized = false;
+
+static inline r2bus_ctx_t *r2bus_resolve_ctx(r2bus_ctx_t *ctx) {
+    if (ctx) {
+        return ctx;
+    }
+    if (!g_r2bus_ctx_initialized) {
+        return NULL;
+    }
+    return g_r2bus_active_ctx;
+}
+
 static inline uint16_t r2bus_crc16_init(void) {
     return R2BUS_CRC_SEED;
 }
@@ -185,30 +199,36 @@ bool r2bus_init(r2bus_ctx_t *ctx,
                 uint8_t node_id,
                 const r2bus_handlers_t *handlers,
                 void *user_data) {
-    if (!ctx || !bus) {
+    if (!bus) {
         return false;
     }
 
-    memset(ctx, 0, sizeof(*ctx));
-    ctx->bus = bus;
-    ctx->node_id = node_id;
+    r2bus_ctx_t *target = ctx ? ctx : &g_r2bus_static_ctx;
+
+    memset(target, 0, sizeof(*target));
+    target->bus = bus;
+    target->node_id = node_id;
 
     if (handlers) {
-        ctx->handlers = *handlers;
+        target->handlers = *handlers;
     }
-    ctx->user_data = user_data;
-    r2bus_reset_rx(ctx);
+    target->user_data = user_data;
+    r2bus_reset_rx(target);
+
+    g_r2bus_active_ctx = target;
+    g_r2bus_ctx_initialized = true;
     return true;
 }
 
 void r2bus_poll(r2bus_ctx_t *ctx) {
-    if (!ctx || !ctx->bus) {
+    r2bus_ctx_t *context = r2bus_resolve_ctx(ctx);
+    if (!context || !context->bus) {
         return;
     }
     uint8_t buffer[R2BUS_RX_BUFFER_SIZE];
-    size_t read = rs485_read_nonblocking(ctx->bus, buffer, sizeof(buffer));
+    size_t read = rs485_read_nonblocking(context->bus, buffer, sizeof(buffer));
     for (size_t i = 0; i < read; ++i) {
-        r2bus_feed_byte(ctx, buffer[i]);
+        r2bus_feed_byte(context, buffer[i]);
     }
 }
 
@@ -217,7 +237,8 @@ bool r2bus_send(r2bus_ctx_t *ctx,
                 r2bus_msg_id_E msg_id,
                 const uint8_t *payload,
                 uint8_t length) {
-    if (!ctx || !ctx->bus || length > R2BUS_MAX_DATA_LENGTH) {
+    r2bus_ctx_t *context = r2bus_resolve_ctx(ctx);
+    if (!context || !context->bus || length > R2BUS_MAX_DATA_LENGTH) {
         return false;
     }
     uint8_t frame[2 + 4 + R2BUS_MAX_DATA_LENGTH + 2];
@@ -227,7 +248,7 @@ bool r2bus_send(r2bus_ctx_t *ctx,
     frame[index++] = R2BUS_SYNC_BYTE_0;
     frame[index++] = R2BUS_SYNC_BYTE_1;
 
-    const uint8_t fields[4] = { dest_id, ctx->node_id, (uint8_t)msg_id, length };
+    const uint8_t fields[4] = { dest_id, context->node_id, (uint8_t)msg_id, length };
     for (size_t i = 0; i < 4; ++i) {
         frame[index++] = fields[i];
         crc = r2bus_crc16_update(crc, fields[i]);
@@ -244,7 +265,7 @@ bool r2bus_send(r2bus_ctx_t *ctx,
     frame[index++] = (uint8_t)(crc & 0xFFu);
     frame[index++] = (uint8_t)((crc >> 8) & 0xFFu);
 
-    rs485_write_blocking(ctx->bus, frame, index);
+    rs485_write_blocking(context->bus, frame, index);
     return true;
 }
 
@@ -253,7 +274,8 @@ bool r2bus_send_proto(r2bus_ctx_t *ctx,
                       r2bus_msg_id_E msg_id,
                       const pb_msgdesc_t *fields,
                       const void *src_struct) {
-    if (!ctx || !fields || !src_struct) {
+    r2bus_ctx_t *context = r2bus_resolve_ctx(ctx);
+    if (!context || !fields || !src_struct) {
         return false;
     }
     uint8_t buffer[R2BUS_MAX_DATA_LENGTH];
@@ -264,7 +286,7 @@ bool r2bus_send_proto(r2bus_ctx_t *ctx,
     if (stream.bytes_written > R2BUS_MAX_DATA_LENGTH) {
         return false;
     }
-    return r2bus_send(ctx, dest_id, msg_id, buffer, (uint8_t)stream.bytes_written);
+    return r2bus_send(context, dest_id, msg_id, buffer, (uint8_t)stream.bytes_written);
 }
 
 bool r2bus_decode_proto(const r2bus_packet_t *packet,
@@ -275,4 +297,8 @@ bool r2bus_decode_proto(const r2bus_packet_t *packet,
     }
     pb_istream_t stream = pb_istream_from_buffer(packet->payload, packet->length);
     return pb_decode(&stream, fields, dst_struct);
+}
+
+r2bus_ctx_t *r2bus_get_active_context(void) {
+    return g_r2bus_ctx_initialized ? g_r2bus_active_ctx : NULL;
 }
