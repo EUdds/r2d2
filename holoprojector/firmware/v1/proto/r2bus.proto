@@ -15,6 +15,10 @@ enum MessageId {
   MESSAGE_ID_HEARTBEAT = 0x04;
   MESSAGE_ID_PSI_COLOR_REQ = 0x05;
   MESSAGE_ID_SERVO_MOVE_CMD = 0x06;
+  MESSAGE_ID_SERVO_HOME_CMD = 0x07;
+  MESSAGE_ID_HOLO_COLOR_REQ = 0x08;
+  MESSAGE_ID_HOLO_POSITION_REQ = 0x09;
+  MESSAGE_ID_PSI_MOOD_REQ = 0x0A;
   MESSAGE_ID_ACK = 0x7F;
 }
 
@@ -39,12 +43,35 @@ message PsiColorRequest {
   uint32 red = 1;
   uint32 green = 2;
   uint32 blue = 3;
+  uint32 brightness = 4;
 }
 
 message ServoMoveCommand {
   uint32 servo = 1;
   float position_deg = 2;
+  // When non-zero, duration_ms carries a raw pulse width request (microseconds).
   uint32 duration_ms = 3;
+}
+
+message ServoHomeCommand {
+  uint32 servo = 1;
+  bool all = 2;
+}
+
+message HoloColorRequest {
+  uint32 red = 1;
+  uint32 green = 2;
+  uint32 blue = 3;
+  uint32 brightness = 4;
+}
+
+message HoloPositionRequest {
+  float azimuth_deg = 1;
+  float elevation_deg = 2;
+}
+
+message PsiMoodRequest {
+  uint32 mood = 1;
 }
 
 message Empty {}

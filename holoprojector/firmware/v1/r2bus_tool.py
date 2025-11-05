@@ -50,6 +50,7 @@ MSG_PONG = MessageId.MESSAGE_ID_PONG
 MSG_HEARTBEAT = MessageId.MESSAGE_ID_HEARTBEAT
 MSG_PSI_COLOR_REQ = MessageId.MESSAGE_ID_PSI_COLOR_REQ
 MSG_SERVO_MOVE_CMD = MessageId.MESSAGE_ID_SERVO_MOVE_CMD
+MSG_SERVO_HOME_CMD = MessageId.MESSAGE_ID_SERVO_HOME_CMD
 MSG_ACK = MessageId.MESSAGE_ID_ACK
 
 PROTO_MESSAGE_BY_ID = {
@@ -59,6 +60,7 @@ PROTO_MESSAGE_BY_ID = {
     MSG_HEARTBEAT: r2bus_pb2.Heartbeat,
     MSG_PSI_COLOR_REQ: r2bus_pb2.PsiColorRequest,
     MSG_SERVO_MOVE_CMD: r2bus_pb2.ServoMoveCommand,
+    MSG_SERVO_HOME_CMD: r2bus_pb2.ServoHomeCommand,
     MSG_ACK: r2bus_pb2.Ack,
 }
 
@@ -228,12 +230,15 @@ def format_frame_details(frame: Frame) -> str:
         return f"psi_color(r={proto.red}, g={proto.green}, b={proto.blue})"
     if frame.msg_id == MSG_SERVO_MOVE_CMD and isinstance(proto, r2bus_pb2.ServoMoveCommand):
         return (
-            "servo_move(servo={servo}, pos={pos:.1f}, duration_ms={dur})".format(
+            "servo_move(servo={servo}, pos={pos:.1f}, pulse_us={pulse})".format(
                 servo=proto.servo,
                 pos=proto.position_deg,
-                dur=proto.duration_ms,
+                pulse=proto.duration_ms if proto.duration_ms else "auto",
             )
         )
+    if frame.msg_id == MSG_SERVO_HOME_CMD and isinstance(proto, r2bus_pb2.ServoHomeCommand):
+        target = "all" if proto.all else proto.servo
+        return f"servo_home(target={target})"
     return f"payload={format_payload(frame.payload)}"
 
 

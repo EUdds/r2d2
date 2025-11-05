@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(NANOPB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-set(NANOPB_SOURCE_DIR ${NANOPB_ROOT}/holoprojector)
+project(nanopb C)
 
 add_library(nanopb STATIC
-    ${NANOPB_SOURCE_DIR}/pb_common.c
-    ${NANOPB_SOURCE_DIR}/pb_decode.c
-    ${NANOPB_SOURCE_DIR}/pb_encode.c
+    pb_common.c
+    pb_decode.c
+    pb_encode.c
 )
 
+# Publish include directory so dependents can include pb_*.h
+# We deliberately avoid pulling in the upstream nanopb CMake logic, which
+# requires the protoc toolchain at configure time. The checked-in generated
+# sources (r2bus.pb.c/h) are built from the Python tooling already, so only the
+# runtime support library is needed here.
 target_include_directories(nanopb
     PUBLIC
-        ${NANOPB_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )

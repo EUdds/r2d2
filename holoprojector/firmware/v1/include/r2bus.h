@@ -13,6 +13,7 @@
 #define R2BUS_MAX_DATA_LENGTH 255u
 #define R2BUS_BROADCAST_ID 0xFFu
 #define R2BUS_HOST_ID 0x00u
+#define R2BUS_MAX_PROTO_PAYLOAD 255u
 
 typedef enum {
     R2BUS_MSG_ECU_RESET = r2bus_MessageId_MESSAGE_ID_ECU_RESET,
@@ -21,6 +22,10 @@ typedef enum {
     R2BUS_MSG_HEARTBEAT = r2bus_MessageId_MESSAGE_ID_HEARTBEAT,
     R2BUS_MSG_PSI_COLOR_REQ = r2bus_MessageId_MESSAGE_ID_PSI_COLOR_REQ,
     R2BUS_MSG_SERVO_MOVE_CMD = r2bus_MessageId_MESSAGE_ID_SERVO_MOVE_CMD,
+    R2BUS_MSG_SERVO_HOME_CMD = r2bus_MessageId_MESSAGE_ID_SERVO_HOME_CMD,
+    R2BUS_MSG_HOLO_COLOR_REQ = r2bus_MessageId_MESSAGE_ID_HOLO_COLOR_REQ,
+    R2BUS_MSG_HOLO_POSITION_REQ = r2bus_MessageId_MESSAGE_ID_HOLO_POSITION_REQ,
+    R2BUS_MSG_PSI_MOOD_REQ = r2bus_MessageId_MESSAGE_ID_PSI_MOOD_REQ,
     R2BUS_MSG_ACK = r2bus_MessageId_MESSAGE_ID_ACK,
 } r2bus_msg_id_E;
 
@@ -77,9 +82,21 @@ bool r2bus_init(r2bus_ctx_t *ctx,
                 const r2bus_handlers_t *handlers,
                 void *user_data);
 
+/* Passing NULL for ctx uses the module's active context established via r2bus_init. */
 void r2bus_poll(r2bus_ctx_t *ctx);
 bool r2bus_send(r2bus_ctx_t *ctx,
                 uint8_t dest_id,
                 r2bus_msg_id_E msg_id,
                 const uint8_t *payload,
                 uint8_t length);
+bool r2bus_send_proto(r2bus_ctx_t *ctx,
+                      uint8_t dest_id,
+                      r2bus_msg_id_E msg_id,
+                      const pb_msgdesc_t *fields,
+                      const void *src_struct);
+
+bool r2bus_decode_proto(const r2bus_packet_t *packet,
+                        const pb_msgdesc_t *fields,
+                        void *dst_struct);
+
+r2bus_ctx_t *r2bus_get_active_context(void);
