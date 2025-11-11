@@ -1,2 +1,0 @@
-r2bus.Ping.payload  max_size:255
-r2bus.Pong.payload  max_size:255
