@@ -51,4 +51,5 @@ void task_100hz(void) {
 void task_1khz(void) {
     r2bus_ctx_t* r2bus = r2bus_get_active_context();
     r2bus_poll(r2bus);
+    r2bus_transmit(r2bus);
 }

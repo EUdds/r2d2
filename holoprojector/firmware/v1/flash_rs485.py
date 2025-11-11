@@ -40,6 +40,8 @@ CMD_BOOT = 0x13
 CMD_ABORT = 0x14
 CMD_ACK = 0x80
 
+MAX_PAYLOAD = 1024
+
 STATUS_TEXT = {
     0: "ok",
     1: "bad-state",
@@ -52,7 +54,7 @@ STATUS_TEXT = {
     8: "invalid-cmd",
 }
 
-HEADER_STRUCT = struct.Struct("<BBBBII")  # sync0, sync1, cmd, version, length, crc
+HEADER_STRUCT = struct.Struct("<BBBBII")  # dest, src, cmd, version, length, crc
 INFO_STRUCT = struct.Struct("<IIIIII8s")
 
 MessageId = r2bus_pb2.MessageId
@@ -185,7 +187,19 @@ def request_application_reset(
 
 
 class BootloaderClient:
-    def __init__(self, port: str, baud: int, timeout: float) -> None:
+    def __init__(
+        self,
+        port: str,
+        baud: int,
+        timeout: float,
+        node_id: int,
+        host_id: int,
+        command_retries: int,
+    ) -> None:
+        if not (0 <= node_id <= 0xFF):
+            raise ValueError("node_id must be in range 0x00-0xFF")
+        if not (0 <= host_id <= 0xFF):
+            raise ValueError("host_id must be in range 0x00-0xFF")
         self.ser = serial.Serial(
             port=port,
             baudrate=baud,
@@ -195,6 +209,9 @@ class BootloaderClient:
         self.ser.reset_input_buffer()
         self.ser.reset_output_buffer()
         self.base_timeout = timeout
+        self.node_id = node_id & 0xFF
+        self.host_id = host_id & 0xFF
+        self.command_retries = max(0, command_retries)
 
     def close(self) -> None:
         if self.ser and self.ser.is_open:
@@ -202,7 +219,15 @@ class BootloaderClient:
 
     def _frame_packet(self, cmd: int, payload: bytes) -> bytes:
         crc = zlib.crc32(payload) & 0xFFFFFFFF
-        return HEADER_STRUCT.pack(SYNC0, SYNC1, cmd, PROTOCOL_VERSION, len(payload), crc) + payload
+        header = HEADER_STRUCT.pack(
+            self.node_id,
+            self.host_id,
+            cmd,
+            PROTOCOL_VERSION,
+            len(payload),
+            crc,
+        )
+        return bytes((SYNC0, SYNC1)) + header + payload
 
     def send_packet(self, cmd: int, payload: bytes = b"") -> None:
         frame = self._frame_packet(cmd, payload)
@@ -220,10 +245,16 @@ class BootloaderClient:
             data.extend(chunk)
         return bytes(data)
 
-    def read_packet(self, timeout: float) -> tuple[int, int, bytes] | None:
+    def read_packet(self, timeout: float) -> tuple[int, int, int, int, bytes] | None:
         deadline = time.monotonic() + timeout
         got_sync0 = False
-        while time.monotonic() < deadline:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            if self.ser.in_waiting == 0:
+                time.sleep(min(0.001, remaining))
+                continue
             byte = self.ser.read(1)
             if not byte:
                 continue
@@ -234,53 +265,98 @@ class BootloaderClient:
             if val != SYNC1:
                 got_sync0 = val == SYNC0
                 continue
-            header = self._read_exact(HEADER_STRUCT.size - 2, deadline)
+            header = self._read_exact(HEADER_STRUCT.size, deadline)
             if header is None:
                 return None
-            cmd, version, length, crc = struct.unpack("<BBII", header)
+            dest, src, cmd, version, length, crc = HEADER_STRUCT.unpack(header)
+            if length > MAX_PAYLOAD:
+                raise ProtocolError(f"Payload too large: {length}")
             payload = self._read_exact(length, deadline)
             if payload is None:
                 return None
             calc_crc = zlib.crc32(payload) & 0xFFFFFFFF
             if calc_crc != crc:
                 raise ProtocolError(f"CRC mismatch for cmd 0x{cmd:02X}")
-            return cmd, version, payload
+            return dest, src, cmd, version, payload
         return None
 
     def expect_ack(self, expected_cmd: int, timeout: float) -> bytes:
-        packet = self.read_packet(timeout)
-        if packet is None:
-            raise ProtocolError("Timed out waiting for ACK")
-        cmd, version, payload = packet
-        if version != PROTOCOL_VERSION:
-            raise ProtocolError(f"Protocol version mismatch: {version}")
-        if cmd != CMD_ACK:
-            raise ProtocolError(f"Unexpected packet 0x{cmd:02X}")
-        if len(payload) < 2:
-            raise ProtocolError("ACK payload too short")
-        acked = payload[0]
-        status = payload[1]
-        if acked != expected_cmd:
-            raise ProtocolError(f"ACK for unexpected command 0x{acked:02X}")
-        if status != 0:
-            text = STATUS_TEXT.get(status, f"err-{status}")
-            extra = payload[2:].decode(errors="ignore")
-            raise BootloaderError(f"{text}: {extra}")
-        return payload[2:]
+        return self._expect_ack_once(expected_cmd, timeout)
+
+    def _expect_ack_once(self, expected_cmd: int, timeout: float) -> bytes:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ProtocolError("Timed out waiting for ACK")
+            packet = self.read_packet(remaining)
+            if packet is None:
+                continue
+            dest, src, cmd, version, payload = packet
+            if dest not in (self.host_id, R2BUS_BROADCAST_ID):
+                continue
+            if src != self.node_id:
+                continue
+            if version != PROTOCOL_VERSION:
+                raise ProtocolError(f"Protocol version mismatch: {version}")
+            if cmd != CMD_ACK:
+                raise ProtocolError(f"Unexpected packet 0x{cmd:02X}")
+            if len(payload) < 2:
+                raise ProtocolError("ACK payload too short")
+            acked = payload[0]
+            status = payload[1]
+            if acked != expected_cmd:
+                raise ProtocolError(f"ACK for unexpected command 0x{acked:02X}")
+            if status != 0:
+                text = STATUS_TEXT.get(status, f"err-{status}")
+                extra = payload[2:].decode(errors="ignore")
+                raise BootloaderError(f"{text}: {extra}")
+            return payload[2:]
+
+    def _command_with_retry(
+        self,
+        cmd: int,
+        payload: bytes,
+        timeout: float,
+        retries: int | None = None,
+    ) -> bytes:
+        attempts = (self.command_retries if retries is None else max(0, retries)) + 1
+        last_protocol_error: ProtocolError | None = None
+        for attempt in range(attempts):
+            if attempt:
+                time.sleep(0.05)
+            self.send_packet(cmd, payload)
+            try:
+                return self._expect_ack_once(cmd, timeout)
+            except BootloaderError:
+                raise
+            except ProtocolError as exc:
+                last_protocol_error = exc
+                continue
+        assert last_protocol_error is not None
+        raise last_protocol_error
 
     def wait_for_bootloader(self, retries: int, delay: float, handshake_timeout: float) -> None:
         for attempt in range(retries):
             try:
-                self.send_packet(CMD_PING)
-                self.expect_ack(CMD_PING, timeout=handshake_timeout)
+                self._command_with_retry(
+                    CMD_PING,
+                    b"",
+                    timeout=handshake_timeout,
+                    retries=self.command_retries,
+                )
                 return
             except (ProtocolError, BootloaderError):
                 time.sleep(delay)
         raise ProtocolError("Bootloader did not respond to ping")
 
     def get_info(self) -> dict[str, int | bytes]:
-        self.send_packet(CMD_INFO)
-        payload = self.expect_ack(CMD_INFO, timeout=max(2.0, self.base_timeout))
+        payload = self._command_with_retry(
+            CMD_INFO,
+            b"",
+            timeout=max(2.0, self.base_timeout),
+            retries=self.command_retries,
+        )
         if len(payload) != INFO_STRUCT.size:
             raise ProtocolError("Unexpected info payload size")
         info = INFO_STRUCT.unpack(payload)
@@ -295,30 +371,42 @@ class BootloaderClient:
         }
 
     def start_session(self, size: int, crc: int, erase_timeout: float) -> None:
-        self.send_packet(CMD_START, struct.pack("<II", size, crc))
-        self.expect_ack(CMD_START, timeout=erase_timeout)
+        self._command_with_retry(
+            CMD_START,
+            struct.pack("<II", size, crc),
+            timeout=erase_timeout,
+            retries=self.command_retries,
+        )
 
     def send_chunk(self, offset: int, data: bytes, timeout: float) -> int:
         payload = struct.pack("<I", offset) + data
         self.send_packet(CMD_DATA, payload)
         # print("Sent chunk offset", offset)
-        ack_payload = self.expect_ack(CMD_DATA, timeout=(timeout+ 5))
+        ack_payload = self._expect_ack_once(CMD_DATA, timeout=(timeout + 5))
         if len(ack_payload) < 4:
             raise ProtocolError("ACK missing progress counter")
         (total_written,) = struct.unpack("<I", ack_payload[:4])
         return total_written
 
     def finish(self) -> tuple[int, int]:
-        self.send_packet(CMD_DONE)
-        payload = self.expect_ack(CMD_DONE, timeout=max(3.0, self.base_timeout))
+        payload = self._command_with_retry(
+            CMD_DONE,
+            b"",
+            timeout=max(3.0, self.base_timeout),
+            retries=self.command_retries,
+        )
         if len(payload) != 8:
             raise ProtocolError("Unexpected DONE payload size")
         return struct.unpack("<II", payload)
 
     def boot(self) -> None:
-        self.send_packet(CMD_BOOT)
         try:
-            self.expect_ack(CMD_BOOT, timeout=max(2.0, self.base_timeout))
+            self._command_with_retry(
+                CMD_BOOT,
+                b"",
+                timeout=max(2.0, self.base_timeout),
+                retries=self.command_retries,
+            )
         except BootloaderError as exc:
             raise BootloaderError(f"Boot failed: {exc}") from exc
 
@@ -372,6 +460,12 @@ def main() -> int:
         type=float,
         help="Seconds to wait after reset before talking to the bootloader (default: %(default)s)",
     )
+    parser.add_argument(
+        "--command-retries",
+        default=2,
+        type=int,
+        help="Extra resend attempts for bootloader commands before failing (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     if not (1 <= args.chunk <= 1024):
@@ -380,6 +474,8 @@ def main() -> int:
         parser.error("Node ID must be between 0x00 and 0xFF")
     if not (0 <= args.host_id <= 0xFF):
         parser.error("Host ID must be between 0x00 and 0xFF")
+    if args.command_retries < 0:
+        parser.error("command-retries must be >= 0")
     node_id = args.node & 0xFF
     host_id = args.host_id & 0xFF
     try:
@@ -412,7 +508,14 @@ def main() -> int:
                 print(f"Waiting {args.bootloader_wait:.2f}s for bootloader...", flush=True)
                 time.sleep(args.bootloader_wait)
 
-        client = BootloaderClient(args.port, args.baud, timeout=args.timeout)
+        client = BootloaderClient(
+            args.port,
+            args.baud,
+            timeout=args.timeout,
+            node_id=node_id,
+            host_id=host_id,
+            command_retries=args.command_retries,
+        )
         print("Waiting for bootloader...", end="", flush=True)
         client.wait_for_bootloader(args.retries, args.delay, handshake_timeout=max(args.timeout, 1.0))
         print(" connected.")
