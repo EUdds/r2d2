@@ -41,6 +41,7 @@ add_executable(front_logic_v1
 
 target_link_libraries(front_logic_v1
     pico_stdlib
+    pico_rand
     hardware_pio
     hardware_dma
     hardware_pwm

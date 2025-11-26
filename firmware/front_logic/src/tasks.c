@@ -24,6 +24,7 @@ void task_1hz(void)
 
 void task_10hz(void)
 {
+    logic_lights_run_animation_step();
 }
 
 void task_100hz(void) 
