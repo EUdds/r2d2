@@ -2,6 +2,17 @@
 #include <hardware/gpio.h>
 #include <pico/time.h>
 
+#define PCBA_REV 1
+
+#if PCBA_REV == 0
+#define RGB_STATUS_LED 0
+#elif PCBA_REV == 1
+#define RGB_STATUS_LED 1
+#else
+#error "Unsupported PCBA_REV"
+#endif
+
+
 typedef struct {
     uint32_t pin;
 } status_led_t;

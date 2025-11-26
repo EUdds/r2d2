@@ -35,6 +35,7 @@ add_executable(front_logic_v1
     src/tasks.c
     src/status_led.c
     src/screen.c
+    src/logic_lights.c
 )
 
 

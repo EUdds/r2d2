@@ -30,9 +30,9 @@ bool rs485_init(const rs485_config_t *config, rs485_bus_t *bus) {
     }
 
     bus->uart = config->uart ? config->uart : RS485_DEFAULT_UART;
-    bus->tx_pin = config->tx_pin ? config->tx_pin : RS485_DEFAULT_TX_PIN;
-    bus->rx_pin = config->rx_pin ? config->rx_pin : RS485_DEFAULT_RX_PIN;
-    bus->dir_pin = config->dir_pin ? config->dir_pin : RS485_DEFAULT_DIR_PIN;
+    bus->tx_pin = config->tx_pin;
+    bus->rx_pin = config->rx_pin;
+    bus->dir_pin = config->dir_pin;
 
     uart_init(bus->uart, config->baud_rate);
     uart_set_hw_flow(bus->uart, false, false);

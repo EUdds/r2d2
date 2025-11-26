@@ -6,37 +6,29 @@
 #include "status_led.h"
 #include <pico/stdio.h>
 #include <stdint.h>
-#include "screen.h"
+#include "logic_lights.h"
 
-typedef struct
+
+void task_setup(void)
 {
-    uint32_t az_deg;
-    uint32_t el_deg;
-} holo_state_t;
-
-static holo_state_t g_holo_state = {
-    .az_deg = 10,
-    .el_deg = 25,
-};
-
-
-void task_setup(void) {
     stdio_init_all();
     status_led_init();
-    screen_init();
+    logic_lights_init();
 }
 
-void task_1hz(void) {
+void task_1hz(void)
+{
     r2bus_publish_heartbeat();
     status_led_toggle();
-    
 }
 
 void task_10hz(void)
 {
 }
 
-void task_100hz(void) {
+void task_100hz(void) 
+{
+    logic_lights_update_screen();
 }
 
 void task_1khz(void) {

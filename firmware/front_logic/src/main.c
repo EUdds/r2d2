@@ -2,13 +2,15 @@
 #include "rs485.h"
 #include "r2bus_receiver.h"
 #include "status_led.h"
+#include <hardware/uart.h>
 #include <hardware/watchdog.h>
 #include <pico/time.h>
+#include "hardware.h"
 
 #include "tasks.h"
 
 // Keep in sync with the dcfront bootloader node ID so ECU resets land correctly.
-#define NODE_ID 0x10u
+#define NODE_ID 0x11u
 
 static volatile bool g_reset_pending = false;
 static absolute_time_t g_reset_deadline;
@@ -24,6 +26,10 @@ int main(void) {
     
     rs485_bus_t rs485;
     rs485_config_t cfg = rs485_config_default(115200);
+    cfg.dir_pin = RS485_DE_PIN;
+    cfg.tx_pin  = UART_TX_PIN;
+    cfg.rx_pin  = UART_RX_PIN;
+    cfg.uart    = RS485_UART;
     if (!rs485_init(&cfg, &rs485)) {
         fatal_blink(100);
     }

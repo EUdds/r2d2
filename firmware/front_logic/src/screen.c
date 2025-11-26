@@ -1,5 +1,6 @@
 #include "screen.h"
 
+#include "hardware.h"
 #include <hardware/gpio.h>
 #include <hardware/spi.h>
 #include <pico/time.h>
@@ -9,22 +10,10 @@
 
 #define SCREEN_SPI              spi0
 #define SCREEN_SPI_BAUDRATE     (40u * 1000u * 1000u)
-#define SCREEN_SPI_CPOL         SPI_CPOL_1
-#define SCREEN_SPI_CPHA         SPI_CPHA_1
+#define SCREEN_SPI_CPOL         SPI_CPOL_0
+#define SCREEN_SPI_CPHA         SPI_CPHA_0
 #define SCREEN_SPI_ORDER        SPI_MSB_FIRST
 
-#define SPI0_MOSI_PIN           19
-#define SPI0_CLK_PIN            18
-#define SPI0_CS_PIN             17
-#define SCREEN_DC_PIN           16
-
-#ifndef SCREEN_WIDTH
-#define SCREEN_WIDTH            320u
-#endif
-
-#ifndef SCREEN_HEIGHT
-#define SCREEN_HEIGHT           240u
-#endif
 
 #ifndef SCREEN_X_OFFSET
 #define SCREEN_X_OFFSET         0u
@@ -65,18 +54,11 @@
 #define ST7789_MADCTL_BGR       0x08
 
 #ifndef SCREEN_MADCTL_VALUE
-#define SCREEN_MADCTL_VALUE     (ST7789_MADCTL_MX | ST7789_MADCTL_MY | ST7789_MADCTL_RGB)
+#define SCREEN_MADCTL_VALUE     (ST7789_MADCTL_MX | ST7789_MADCTL_MY | ST7789_MADCTL_MV | ST7789_MADCTL_RGB)
 #endif
 
 static uint screen_current_data_bits = 8u;
 
-static inline uint16_t screen_24bit_to_16bit_color(uint8_t r, uint8_t g, uint8_t b)
-{
-    uint16_t r5 = (uint16_t)(r >> 3u) & 0x1Fu;
-    uint16_t g6 = (uint16_t)(g >> 2u) & 0x3Fu;
-    uint16_t b5 = (uint16_t)(b >> 3u) & 0x1Fu;
-    return (uint16_t)((r5 << 11u) | (g6 << 5u) | b5);
-}
 
 static inline void screen_select(void)
 {
@@ -169,15 +151,15 @@ static void screen_run_init_sequence(void)
 {
     static const uint8_t porch_ctrl[] = {0x0C, 0x0C, 0x00, 0x33, 0x33};
     static const uint8_t gctrl[] = {0x35};
-    static const uint8_t vcoms[] = {0x2B};
+    static const uint8_t vcoms[] = {0x35};
     static const uint8_t lcmctrl[] = {0x2C};
-    static const uint8_t vdvvrhen[] = {0x01, 0xFF};
+    static const uint8_t vdvvrhen[] = {0x01};
     static const uint8_t vrhs[] = {0x11};
     static const uint8_t vdvs[] = {0x20};
     static const uint8_t frctrl2[] = {0x0F};
     static const uint8_t pwctrl1[] = {0xA4, 0xA1};
-    static const uint8_t colmod[] = {0x55};
-    static const uint8_t madctl[] = {SCREEN_MADCTL_VALUE};
+    static const uint8_t colmod[] = {0x05};
+    static const uint8_t madctl[] = {0x70};
     static const uint8_t pvgam[] = {0xD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54, 0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23};
     static const uint8_t nvgam[] = {0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44, 0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23};
 
@@ -187,16 +169,17 @@ static void screen_run_init_sequence(void)
     screen_write_command(ST7789_CMD_SLPOUT);
     sleep_ms(120);
 
+    screen_write_command_with_data(ST7789_CMD_COLMOD, colmod, sizeof(colmod));
     screen_write_command_with_data(ST7789_CMD_PORCTRL, porch_ctrl, sizeof(porch_ctrl));
     screen_write_command_with_data(ST7789_CMD_GCTRL, gctrl, sizeof(gctrl));
     screen_write_command_with_data(ST7789_CMD_VCOMS, vcoms, sizeof(vcoms));
     screen_write_command_with_data(ST7789_CMD_LCMCTRL, lcmctrl, sizeof(lcmctrl));
     screen_write_command_with_data(ST7789_CMD_VDVVRHEN, vdvvrhen, sizeof(vdvvrhen));
+    
     screen_write_command_with_data(ST7789_CMD_VRHS, vrhs, sizeof(vrhs));
     screen_write_command_with_data(ST7789_CMD_VDVS, vdvs, sizeof(vdvs));
     screen_write_command_with_data(ST7789_CMD_FRCTRL2, frctrl2, sizeof(frctrl2));
     screen_write_command_with_data(ST7789_CMD_PWCTRL1, pwctrl1, sizeof(pwctrl1));
-    screen_write_command_with_data(ST7789_CMD_COLMOD, colmod, sizeof(colmod));
     screen_write_command_with_data(ST7789_CMD_MADCTL, madctl, sizeof(madctl));
     screen_write_command_with_data(ST7789_CMD_PVGAMCTRL, pvgam, sizeof(pvgam));
     screen_write_command_with_data(ST7789_CMD_NVGAMCTRL, nvgam, sizeof(nvgam));
@@ -229,7 +212,8 @@ void screen_init(void)
     gpio_put(SCREEN_DC_PIN, 1);
 
     screen_run_init_sequence();
-    screen_fill_color(0xF420); // Magenta
+
+    screen_fill_color(0x00);
 }
 
 void screen_fill_color(uint16_t color)
