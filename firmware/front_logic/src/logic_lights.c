@@ -6,7 +6,7 @@
 #include <pico/rand.h>
 
 #define LED_MATRIX_ROWS       5
-#define LED_MATRIX_COLS       9
+#define LED_MATRIX_COLS       8
 #define LED_MATRIX_SPACING    15
 #define LED_RADIUS            10
 
@@ -266,7 +266,7 @@ void logic_lights_init(void)
             led_matrix_colors[row][col] = init_color;
         }
     }
-    logic_lights_create_led_matrix(5, 9, 15, 10, led_matrix_colors); // Create a 5x8 matrix of red LEDs
+    logic_lights_create_led_matrix(LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_SPACING, LED_RADIUS, led_matrix_colors); // Create a 5x8 matrix of red LEDs
 }
 
 void logic_lights_run_animation_step(void)

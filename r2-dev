@@ -1,0 +1,8 @@
+#! /bin/bash
+
+set -e
+bazel build //dome_motor:dome_motor_install
+sudo apt install -y --reinstall $(pwd)/bazel-bin/dome_motor/dome-motor_0.1.0_all.deb
+set +e
+
+echo "Dome motor package installed."

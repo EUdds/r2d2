@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 #define SCREEN_SPI              spi0
-#define SCREEN_SPI_BAUDRATE     (40u * 1000u * 1000u)
+#define SCREEN_SPI_BAUDRATE     (10u * 1000u * 1000u)
 #define SCREEN_SPI_CPOL         SPI_CPOL_0
 #define SCREEN_SPI_CPHA         SPI_CPHA_0
 #define SCREEN_SPI_ORDER        SPI_MSB_FIRST
@@ -50,11 +50,12 @@
 #define ST7789_MADCTL_MY        0x80
 #define ST7789_MADCTL_MX        0x40
 #define ST7789_MADCTL_MV        0x20
+#define ST7789_MADCTL_ML        0x10
 #define ST7789_MADCTL_RGB       0x00
 #define ST7789_MADCTL_BGR       0x08
 
 #ifndef SCREEN_MADCTL_VALUE
-#define SCREEN_MADCTL_VALUE     (ST7789_MADCTL_MX | ST7789_MADCTL_MY | ST7789_MADCTL_MV | ST7789_MADCTL_RGB)
+#define SCREEN_MADCTL_VALUE     (ST7789_MADCTL_MX | ST7789_MADCTL_MV | ST7789_MADCTL_ML)
 #endif
 
 static uint screen_current_data_bits = 8u;
@@ -159,7 +160,7 @@ static void screen_run_init_sequence(void)
     static const uint8_t frctrl2[] = {0x0F};
     static const uint8_t pwctrl1[] = {0xA4, 0xA1};
     static const uint8_t colmod[] = {0x05};
-    static const uint8_t madctl[] = {0x70};
+    static const uint8_t madctl[] = {SCREEN_MADCTL_VALUE};
     static const uint8_t pvgam[] = {0xD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54, 0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23};
     static const uint8_t nvgam[] = {0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44, 0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23};
 
@@ -210,6 +211,11 @@ void screen_init(void)
     gpio_init(SCREEN_DC_PIN);
     gpio_set_dir(SCREEN_DC_PIN, GPIO_OUT);
     gpio_put(SCREEN_DC_PIN, 1);
+
+    gpio_init(SCREEN_RESET_PIN);
+    gpio_set_dir(SCREEN_RESET_PIN, GPIO_OUT);
+    gpio_put(SCREEN_RESET_PIN, 1);
+    sleep_ms(10);
 
     screen_run_init_sequence();
 

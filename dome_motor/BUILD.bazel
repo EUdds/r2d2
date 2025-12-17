@@ -1,0 +1,104 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+load("@rules_pkg//:pkg.bzl", "pkg_deb")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes")
+
+
+cc_library(
+    name = "TMC2209",
+    srcs = ["TMC2209.cpp"],
+    hdrs = ["TMC2209.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//dome_motor:gpiod_dep",
+    ],
+)
+
+cc_library(
+    name = "dome_motor",
+    srcs = ["DomeMotor.cpp"],
+    hdrs = ["DomeMotor.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":TMC2209",
+    ],
+)
+
+cc_binary(
+    name = "hello_motor",
+    srcs = ["hello_motor.cpp"],
+    deps = [
+        ":TMC2209",
+    ],
+)
+
+cc_binary(
+    name = "domectl",
+    srcs = ["dome_cli.cpp"],
+    deps = [
+        ":dome_motor",
+    ],
+)
+
+cc_library(
+    name = "gpiod_dep",
+    hdrs = [],
+    includes = ["/usr/include"],
+    linkopts = ["-lgpiod"],
+    visibility = ["//visibility:public"],
+)
+
+pkg_files(
+    name = "dome_motor_lib_pkg",
+    # Ship both dome_motor and the driver library so downstream consumers
+    # get all required symbols when installing the dev package.
+    srcs = [
+        ":dome_motor",   # produces libdome_motor.a/.so
+        ":TMC2209",      # produces libTMC2209.a/.so
+    ],
+    prefix = "usr/local/lib",
+)
+
+
+pkg_files(
+    name = "dome_motor_headers_pkg",
+    srcs = ["DomeMotor.hpp", "TMC2209.hpp"],
+    prefix = "usr/local/include/dome_motor",
+)
+
+attributes = pkg_attributes(
+    name = "dome_motor_pkg_attrs",
+    mode = "0755",
+    user = "root",
+    group = "gpio",
+)
+
+pkg_files(
+    name = "dome_cli_pkg",
+    srcs = [":domectl"],       # cc_binary output
+    prefix = "usr/local/bin",   # install path
+    include_runfiles = True,
+    attributes = attributes
+)
+
+pkg_tar(
+    name = "dome_motor_dev_tar",
+    srcs = [
+        ":dome_motor_lib_pkg",
+        ":dome_motor_headers_pkg",
+        ":dome_cli_pkg",
+    ],
+    extension = "tar.gz",
+    visibility = ["//visibility:public"],
+)
+
+pkg_deb(
+    name = "dome_motor_install",
+    data = ":dome_motor_dev_tar",
+    package = "dome-motor",
+    description = "Dome Motor Control Library",
+    maintainer = "Eric Udlis",
+    version = "0.1.0",
+    visibility = ["//visibility:public"]
+)
