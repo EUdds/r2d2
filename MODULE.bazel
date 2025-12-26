@@ -1,2 +1,14 @@
 bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "pico-sdk", version = "2.2.1-develop.bcr.20250915-8fcd44a1")
+
+register_toolchains(
+    "@pico-sdk//bazel/toolchain:linux-x86_64-rp2040",
+    "@pico-sdk//bazel/toolchain:linux-x86_64-rp2350",
+    "@pico-sdk//bazel/toolchain:win-x86_64-rp2040",
+    "@pico-sdk//bazel/toolchain:win-x86_64-rp2350",
+    "@pico-sdk//bazel/toolchain:mac-x86_64-rp2040",
+    "@pico-sdk//bazel/toolchain:mac-x86_64-rp2350",
+    "@pico-sdk//bazel/toolchain:mac-aarch64-rp2040",
+    "@pico-sdk//bazel/toolchain:mac-aarch64-rp2350",
+)

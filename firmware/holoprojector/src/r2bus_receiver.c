@@ -13,7 +13,7 @@ static void handle_servo_move_command(const r2bus_packet_t *packet, void *user_d
 static void handle_servo_home_command(const r2bus_packet_t *packet, void *user_data);
 static void handle_holo_color_request(const r2bus_packet_t *packet, void *user_data);
 static void handle_psi_color_request(const r2bus_packet_t *packet, void *user_data);
-static void handle_psi_modd_request(const r2bus_packet_t *packet, void *user_data);
+static void handle_psi_mood_request(const r2bus_packet_t *packet, void *user_data);
 static uint32_t clamp_u32(uint32_t value, uint32_t min_value, uint32_t max_value);
 
 static uint32_t clamp_u32(uint32_t value, uint32_t min_value, uint32_t max_value)

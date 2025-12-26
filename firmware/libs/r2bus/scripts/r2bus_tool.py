@@ -68,7 +68,8 @@ PROTO_MESSAGE_BY_ID = {
 
 def msg_name(msg_id: int) -> str:
     try:
-        return r2bus_pb2.MessageId.Name(msg_id)
+        raw_msg_name = r2bus_pb2.MessageId.Name(msg_id)
+        return raw_msg_name.replace("MESSAGE_ID_", "")
     except ValueError:
         return f"0x{msg_id:02X}"
 
@@ -247,8 +248,8 @@ def format_frame(frame: Frame) -> str:
     timestamp = time.strftime("%H:%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
     name = msg_name(frame.msg_id)
     return (
-        f"{timestamp} "
-        f"{frame.src:02X} -> {frame.dest:02X} "
+        f"{timestamp} " 
+        f"{frame.src:02X}:{frame.dest:02X} "
         f"{name} len={frame.length} {format_frame_details(frame)}"
     )
 

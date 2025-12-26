@@ -9,9 +9,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
+file(GLOB ROS_MSG_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" CONFIGURE_DEPENDS "msg/*.msg")
+file(GLOB ROS_SRV_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" CONFIGURE_DEPENDS "srv/*.srv")
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/HoloprojectorState.msg"
+  ${ROS_MSG_FILES}
+  ${ROS_SRV_FILES}
   DEPENDENCIES std_msgs
 )
 
