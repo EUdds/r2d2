@@ -9,41 +9,23 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs)
+
+set(COMMON_LIBS_DIR "${CMAKE_CURRENT_LIST_DIR}/../libs")
 
 set(R2BUS_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../libs/r2bus")
 if(NOT EXISTS "${R2BUS_LIB_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "Expected shared r2bus library at ${R2BUS_LIB_DIR}")
 endif()
 
-set(_nanopb_candidates
-    "${CMAKE_CURRENT_LIST_DIR}/../holoprojector/libs/nanopb"
-    "${CMAKE_CURRENT_LIST_DIR}/../../holoprojector/firmware/v1/libs/nanopb"
-)
-set(NANOPB_LIB_DIR "")
-foreach(_candidate IN LISTS _nanopb_candidates)
-    if(EXISTS "${_candidate}/CMakeLists.txt")
-        set(NANOPB_LIB_DIR "${_candidate}")
-        break()
-    endif()
-endforeach()
-if(NOT NANOPB_LIB_DIR)
-    message(FATAL_ERROR "Expected nanopb library at one of: ${_nanopb_candidates}")
+set(NANOPB_LIB_DIR "${COMMON_LIBS_DIR}/nanopb")
+if(NOT EXISTS "${NANOPB_LIB_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Expected shared nanopb library at ${NANOPB_LIB_DIR}")
 endif()
 
-set(_fixmath_candidates
-    "${CMAKE_CURRENT_SOURCE_DIR}/libs/pico-libfixmath/include"
-    "${CMAKE_CURRENT_LIST_DIR}/../holoprojector/libs/pico-libfixmath/include"
-)
-set(FIXMATH_INCLUDE_DIR "")
-foreach(_candidate IN LISTS _fixmath_candidates)
-    if(EXISTS "${_candidate}")
-        set(FIXMATH_INCLUDE_DIR "${_candidate}")
-        break()
-    endif()
-endforeach()
-if(NOT FIXMATH_INCLUDE_DIR)
-    message(WARNING "pico-libfixmath include dir not found; continuing without it")
+set(FIXMATH_INCLUDE_DIR "${COMMON_LIBS_DIR}/pico-libfixmath/include")
+if(NOT EXISTS "${FIXMATH_INCLUDE_DIR}")
+    set(FIXMATH_INCLUDE_DIR "")
+    message(WARNING "pico-libfixmath include dir not found at ${COMMON_LIBS_DIR}/pico-libfixmath/include; continuing without it")
 endif()
 
 add_subdirectory(${NANOPB_LIB_DIR} ${CMAKE_CURRENT_BINARY_DIR}/nanopb)

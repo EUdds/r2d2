@@ -1,0 +1,10 @@
+# Firmware update service for embedded R2 bus nodes.
+# The firmware_path should point to a .bin file for the target node.
+uint8 node_id
+string firmware_path
+bool skip_reset
+bool skip_boot
+---
+bool success
+string message
+uint32 bytes_written

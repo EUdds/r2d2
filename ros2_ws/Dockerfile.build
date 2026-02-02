@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1.6
+
+FROM ros:jazzy-ros-base
+
+# Build tooling
+RUN apt-get update && apt-get install -y \
+    python3-colcon-common-extensions \
+    build-essential \
+    ros-dev-tools \
+    git \
+    python3-fastapi \
+    python3-uvicorn \
+    python3-pydantic \
+    python3-protobuf \
+    python3-serial \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libprotoc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /ws
+
+# Copy ROS sources
+COPY src ./src
+
+# Resolve dependencies
+RUN . /opt/ros/jazzy/setup.sh && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -r -y
+
+# Build workspace (gateway + interfaces required)
+RUN . /opt/ros/jazzy/setup.sh && \
+    colcon build --packages-select interfaces gateway --merge-install

@@ -54,6 +54,88 @@ void DomeMotor::rotateToAngleOpenLoop(double target_deg) {
     rotateDegrees(error);
 }
 
+void DomeMotor::rotateToAngleWithRamp(double target_deg, const RampConfig& ramp) {
+    const double total_distance = shortestError(target_deg, current_angle_deg_);
+    if (std::abs(total_distance) < 0.01) {
+        return;  // Already at target
+    }
+
+    const bool clockwise = total_distance > 0.0;
+    const double abs_distance = std::abs(total_distance);
+
+    // Calculate trapezoidal profile parameters
+    const double v_min = std::abs(ramp.min_speed_dps);
+    const double v_max = std::abs(ramp.max_speed_dps);
+    const double accel = std::abs(ramp.accel_dps2);
+    const double decel = std::abs(ramp.decel_dps2);
+
+    // Distance needed to accelerate from v_min to v_max
+    const double accel_distance = (v_max * v_max - v_min * v_min) / (2.0 * accel);
+    // Distance needed to decelerate from v_max to v_min
+    const double decel_distance = (v_max * v_max - v_min * v_min) / (2.0 * decel);
+
+    // Check if we can reach max speed or if it's a triangular profile
+    const double min_distance_for_trapezoid = accel_distance + decel_distance;
+    bool is_triangular = abs_distance < min_distance_for_trapezoid;
+
+    double peak_speed = v_max;
+    double actual_accel_distance = accel_distance;
+    double actual_decel_distance = decel_distance;
+    double cruise_distance = 0.0;
+
+    if (is_triangular) {
+        // Calculate peak speed for triangular profile
+        peak_speed = std::sqrt(v_min * v_min + abs_distance * accel * decel / (accel + decel));
+        actual_accel_distance = (peak_speed * peak_speed - v_min * v_min) / (2.0 * accel);
+        actual_decel_distance = (peak_speed * peak_speed - v_min * v_min) / (2.0 * decel);
+    } else {
+        // Trapezoidal profile - cruise at max speed
+        cruise_distance = abs_distance - accel_distance - decel_distance;
+    }
+
+    // Execute motion profile step by step
+    double distance_traveled = 0.0;
+    driver_.setDirection(clockwise);
+
+    while (distance_traveled < abs_distance) {
+        // Determine current speed based on position in profile
+        double current_speed;
+        if (distance_traveled < actual_accel_distance) {
+            // Acceleration phase
+            current_speed = std::sqrt(v_min * v_min + 2.0 * accel * distance_traveled);
+            current_speed = std::min(current_speed, peak_speed);
+        } else if (distance_traveled < actual_accel_distance + cruise_distance) {
+            // Cruise phase
+            current_speed = peak_speed;
+        } else {
+            // Deceleration phase
+            const double remaining_distance = abs_distance - distance_traveled;
+            current_speed = std::sqrt(v_min * v_min + 2.0 * decel * remaining_distance);
+            current_speed = std::max(current_speed, v_min);
+        }
+
+        // Calculate delay between steps based on current speed
+        const double steps_per_second = current_speed * steps_per_dome_deg_;
+        const double min_delay_us = static_cast<double>(timing_.min_step_delay.count());
+        const double requested_delay_us = steps_per_second > 0.0 ? (1'000'000.0 / steps_per_second) : min_delay_us;
+        const auto step_delay = std::chrono::microseconds(
+            static_cast<long long>(std::max(min_delay_us, requested_delay_us)));
+
+        // Take one step
+        driver_.stepOnce(timing_.pulse_width);
+
+        // Update position
+        const double step_distance = 1.0 / steps_per_dome_deg_;
+        distance_traveled += step_distance;
+        current_angle_deg_ = normalizeAngle(current_angle_deg_ + (clockwise ? step_distance : -step_distance));
+
+        // Wait before next step (unless we're at the end)
+        if (distance_traveled < abs_distance) {
+            std::this_thread::sleep_for(step_delay);
+        }
+    }
+}
+
 bool DomeMotor::moveToAnglePID(double target_deg,
                                const PIDConfig& pid,
                                const std::function<double()>& read_angle_deg) {

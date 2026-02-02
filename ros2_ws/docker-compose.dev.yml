@@ -1,0 +1,27 @@
+version: '3'
+services:
+  ros2:
+    build:
+      context: .
+      dockerfile: dockerfile.dev
+      args:
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+        USERNAME: ${USER:-eudlis-dev}
+    container_name: ros2_jazzy
+    network_mode: host
+    volumes:
+      - ./src:/home/${USER:-rosuser}/ros2_ws/src
+      - ./install:/home/${USER:-rosuser}/ros2_ws/install
+      - ./build:/home/${USER:-rosuser}/ros2_ws/build
+      - ./log:/home/${USER:-rosuser}/ros2_ws/log
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    working_dir: /home/${USER:-rosuser}/ros2_ws
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=0
+      - LIBGL_ALWAYS_INDIRECT=0
+    user: "${UID:-1000}:${GID:-1000}"

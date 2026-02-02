@@ -28,6 +28,22 @@ public:
               accel_scale(accel_scale_in) {}
     };
 
+    struct RampConfig {
+        double max_speed_dps;        // Maximum speed in deg/s
+        double min_speed_dps;        // Minimum speed (starting/ending speed)
+        double accel_dps2;           // Acceleration in deg/s^2
+        double decel_dps2;           // Deceleration in deg/s^2
+
+        RampConfig(double max_speed = 45.0,
+                   double min_speed = 5.0,
+                   double accel = 30.0,
+                   double decel = 30.0)
+            : max_speed_dps(max_speed),
+              min_speed_dps(min_speed),
+              accel_dps2(accel),
+              decel_dps2(decel) {}
+    };
+
     struct PIDConfig {
         double kp;
         double ki;
@@ -70,6 +86,9 @@ public:
     // Open-loop helpers.
     void rotateDegrees(double degrees);
     void rotateToAngleOpenLoop(double target_deg);
+
+    // Move to angle with trapezoidal speed ramping (smooth accel/decel).
+    void rotateToAngleWithRamp(double target_deg, const RampConfig& ramp);
 
     // Closed-loop move using a user-provided angle reader (e.g., IMU/encoder).
     // Returns true on success within tolerance before timeout.

@@ -42,19 +42,25 @@ if(NOT _r2bus_nanopb_generator_paths)
     message(FATAL_ERROR "Unable to locate nanopb generator directory. Set R2BUS_NANOPB_HINTS to your nanopb checkout.")
 endif()
 
+if(PROTOC_EXECUTABLE AND NOT EXISTS "${PROTOC_EXECUTABLE}")
+    unset(PROTOC_EXECUTABLE CACHE)
+endif()
+
+if(NANOPB_PLUGIN AND NOT EXISTS "${NANOPB_PLUGIN}")
+    unset(NANOPB_PLUGIN CACHE)
+endif()
+
 if(NOT PROTOC_EXECUTABLE)
     find_program(PROTOC_EXECUTABLE
         NAMES protoc protoc.exe protoc.bat
-        PATHS ${_r2bus_nanopb_generator_paths}
-        NO_DEFAULT_PATH
+        HINTS ${_r2bus_nanopb_generator_paths}
     )
 endif()
 
 if(NOT NANOPB_PLUGIN)
     find_program(NANOPB_PLUGIN
         NAMES nanopb_generator.py nanopb_generator nanopb_generator.bat
-        PATHS ${_r2bus_nanopb_generator_paths}
-        NO_DEFAULT_PATH
+        HINTS ${_r2bus_nanopb_generator_paths}
     )
 endif()
 

@@ -9,7 +9,21 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs)
+
+set(COMMON_LIBS_DIR "${CMAKE_CURRENT_LIST_DIR}/../libs")
+
+set(NANOPB_LIB_DIR "${COMMON_LIBS_DIR}/nanopb")
+if(NOT EXISTS "${NANOPB_LIB_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Expected shared nanopb library at ${NANOPB_LIB_DIR}")
+endif()
+
+set(FIXMATH_LIB_DIR "${COMMON_LIBS_DIR}/pico-libfixmath")
+if(NOT EXISTS "${FIXMATH_LIB_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Expected shared pico-libfixmath library at ${FIXMATH_LIB_DIR}")
+endif()
+
+add_subdirectory(${FIXMATH_LIB_DIR} ${CMAKE_CURRENT_BINARY_DIR}/pico-libfixmath)
+add_subdirectory(${NANOPB_LIB_DIR} ${CMAKE_CURRENT_BINARY_DIR}/nanopb)
 
 set(R2BUS_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../libs/r2bus")
 if(NOT EXISTS "${R2BUS_LIB_DIR}/CMakeLists.txt")
@@ -17,8 +31,8 @@ if(NOT EXISTS "${R2BUS_LIB_DIR}/CMakeLists.txt")
 endif()
 
 set(R2BUS_NANOPB_HINTS
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/nanopb/generator
-    ${CMAKE_CURRENT_SOURCE_DIR}/../libs/nanopb
+    ${NANOPB_LIB_DIR}/generator
+    ${NANOPB_LIB_DIR}
 )
 add_subdirectory(${R2BUS_LIB_DIR} ${CMAKE_CURRENT_BINARY_DIR}/r2bus)
 
@@ -52,7 +66,7 @@ target_include_directories(holoprojector_pico_v1
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/proto
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/pico-libfixmath/include
+        ${FIXMATH_LIB_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../holoprojector
 )
 

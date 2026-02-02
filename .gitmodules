@@ -1,0 +1,9 @@
+[submodule "firmware/libs/pico-libfixmath"]
+	path = firmware/libs/pico-libfixmath
+	url = https://github.com/irishpatrick/pico-libfixmath.git
+[submodule "firmware/libs/nanopb"]
+	path = firmware/libs/nanopb
+	url = git@github.com:nanopb/nanopb.git
+[submodule "firmware/bootloader/rp2040-rs485-bootloader"]
+	path = firmware/bootloader/rp2040-rs485-bootloader
+	url = git@github.com:EUdds/rp2040-rs485-bootloader.git
