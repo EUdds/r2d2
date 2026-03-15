@@ -3,17 +3,16 @@
 set -e
 
 usage() {
-    echo "Usage: r2-dev <target> [options]"
+    echo "Usage: r2-dev <target>"
     echo ""
     echo "Targets:"
-    echo "  dome_motor          Build and install dome motor package"
-    echo "  firmware [platform] Build all firmware (platform: rp2040 [default] | rp2350)"
-    echo "  all [platform]      Build everything"
+    echo "  dome_motor   Build and install dome motor package"
+    echo "  firmware     Build all firmware (platforms are baked into targets)"
+    echo "  all          Build everything"
     echo ""
     echo "Examples:"
     echo "  ./r2-dev dome_motor"
     echo "  ./r2-dev firmware"
-    echo "  ./r2-dev firmware rp2350"
     echo "  ./r2-dev all"
 }
 
@@ -26,18 +25,15 @@ build_dome_motor() {
 }
 
 build_firmware() {
-    local platform=${1:-rp2040}
     local out_dir
     out_dir="$(dirname "$0")/out"
     mkdir -p "$out_dir"
 
-    bazel build //firmware:all \
-        --platforms=@pico-sdk//bazel/platform:"$platform" \
-        --aspects @pico-sdk//tools:uf2_aspect.bzl%pico_uf2_aspect \
-        --output_groups=+pico_uf2_files
+    bazel build //firmware:all
 
     find bazel-bin/firmware -type f -name "*.uf2" -exec install -m 644 {} "$out_dir/" \;
     find bazel-bin/firmware -type f -name "*.elf" -exec install -m 644 {} "$out_dir/" \;
+    find bazel-bin/firmware -type f -name "*.hex" -exec install -m 644 {} "$out_dir/" \;
 
     echo "Firmware artifacts in $out_dir:"
     ls "$out_dir"
@@ -50,11 +46,11 @@ case "$TARGET" in
         build_dome_motor
         ;;
     firmware)
-        build_firmware "${2:-rp2040}"
+        build_firmware
         ;;
     all)
         build_dome_motor
-        build_firmware "${2:-rp2040}"
+        build_firmware
         ;;
     *)
         usage

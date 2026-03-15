@@ -4,6 +4,34 @@ load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "OBJ_COPY_ACTION_NAME
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cpp_toolchain", "use_cc_toolchain")
 
+def _platform_transition_impl(settings, attr):
+    return {"//command_line_option:platforms": [attr.platform]}
+
+_platform_transition = transition(
+    implementation = _platform_transition_impl,
+    inputs = [],
+    outputs = ["//command_line_option:platforms"],
+)
+
+def _platform_firmware_impl(ctx):
+    files = depset(transitive = [t[DefaultInfo].files for t in ctx.attr.targets])
+    return [DefaultInfo(files = files)]
+
+platform_firmware = rule(
+    doc = """Wraps a firmware filegroup target and fixes its build platform.
+
+    Allows `bazel build //firmware:front_logic_v1` without --platforms.
+    """,
+    implementation = _platform_firmware_impl,
+    attrs = {
+        "targets": attr.label_list(cfg = _platform_transition),
+        "platform": attr.string(mandatory = True),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
+    },
+)
+
 def _pico_hex_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
