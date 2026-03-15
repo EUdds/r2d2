@@ -14,8 +14,13 @@ _platform_transition = transition(
 )
 
 def _platform_firmware_impl(ctx):
-    files = depset(transitive = [t[DefaultInfo].files for t in ctx.attr.targets])
-    return [DefaultInfo(files = files)]
+    outputs = []
+    for target in ctx.attr.targets:
+        for f in target[DefaultInfo].files.to_list():
+            out = ctx.actions.declare_file(f.basename)
+            ctx.actions.symlink(output = out, target_file = f)
+            outputs.append(out)
+    return [DefaultInfo(files = depset(outputs))]
 
 platform_firmware = rule(
     doc = """Wraps a firmware filegroup target and fixes its build platform.
@@ -79,6 +84,14 @@ def pico_binary(name, **kwargs):
     stem = base.replace("/", "_")  # e.g. "front_logic_1" (for filenames)
 
     native.genrule(
+        name = base + "/elf_copy",
+        srcs = [":" + name],
+        outs = [stem + ".elf"],
+        cmd = "cp $< $@",
+        target_compatible_with = kwargs.get("target_compatible_with", []),
+    )
+
+    native.genrule(
         name = base + "/uf2",
         srcs = [":" + name],
         outs = [stem + ".uf2"],
@@ -97,7 +110,7 @@ def pico_binary(name, **kwargs):
     native.filegroup(
         name = base,
         srcs = [
-            ":" + name,
+            ":" + base + "/elf_copy",
             ":" + base + "/uf2",
             ":" + base + "/hex",
         ],
