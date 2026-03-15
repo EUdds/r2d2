@@ -3,3 +3,6 @@ install
 fw_build
 log
 .cache
+BUILD_v2
+compile_commands.json
+.claude/

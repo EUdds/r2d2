@@ -1,17 +1,32 @@
 #include "status_led.h"
-#include <hardware/gpio.h>
+#include "hardware.h"
 #include <pico/time.h>
 
-#define PCBA_REV 1
+#if PCB_REV >= 2
+#include "board.h"
 
-#if PCBA_REV == 0
-#define RGB_STATUS_LED 0
-#elif PCBA_REV == 1
-#define RGB_STATUS_LED 1
+void status_led_init(void)
+{
+    // LEDs already initialized by board_init() via board_led_init()
+}
+
+void status_led_toggle(void)
+{
+    LED_GREEN_TOGGLE();
+}
+
+void fatal_blink(uint32_t period)
+{
+    while (true) {
+        LED_RED_ON();
+        sleep_ms(period / 2);
+        LED_RED_OFF();
+        sleep_ms(period / 2);
+    }
+}
+
 #else
-#error "Unsupported PCBA_REV"
-#endif
-
+#include <hardware/gpio.h>
 
 typedef struct {
     uint32_t pin;
@@ -31,7 +46,6 @@ void status_led_toggle(void)
 {
     bool current_state = gpio_get(status_led_app.pin);
     gpio_put(status_led_app.pin, !current_state);
-
 }
 
 void fatal_blink(uint32_t period)
@@ -43,3 +57,4 @@ void fatal_blink(uint32_t period)
         sleep_ms(period / 2);
     }
 }
+#endif

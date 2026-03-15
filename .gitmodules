@@ -7,3 +7,6 @@
 [submodule "firmware/bootloader/rp2040-rs485-bootloader"]
 	path = firmware/bootloader/rp2040-rs485-bootloader
 	url = git@github.com:EUdds/rp2040-rs485-bootloader.git
+[submodule "firmware/libs/pico-sdk"]
+	path = firmware/libs/pico-sdk
+	url = https://github.com/raspberrypi/pico-sdk.git

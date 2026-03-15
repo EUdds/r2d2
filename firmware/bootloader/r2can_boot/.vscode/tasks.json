@@ -1,0 +1,70 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build r2can_boot",
+            "type": "shell",
+            "command": "${workspaceFolder}/firmware/bootloader/r2can_boot/build.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Clean Build r2can_boot",
+            "type": "shell",
+            "command": "${workspaceFolder}/firmware/bootloader/r2can_boot/build.sh",
+            "args": [
+                "--clean"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Build and Flash r2can_boot",
+            "type": "shell",
+            "command": "${workspaceFolder}/firmware/bootloader/r2can_boot/build.sh",
+            "args": [
+                "--flash"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Build r2can_boot (RP2040)",
+            "type": "shell",
+            "command": "${workspaceFolder}/firmware/bootloader/r2can_boot/build.sh",
+            "args": [
+                "--board",
+                "pico"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
