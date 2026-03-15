@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_toolchain")
+
 package(default_visibility = ["//visibility:public"])
 
 load("//tools/cc:aarch64_toolchain_config.bzl", "aarch64_linux_toolchain_config")

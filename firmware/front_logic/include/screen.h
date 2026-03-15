@@ -15,7 +15,7 @@ void screen_fill_color(uint16_t color);
 void screen_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color);
 void screen_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *pixels);
 
-inline uint16_t screen_24bit_to_16bit_color(uint8_t r, uint8_t g, uint8_t b)
+static inline uint16_t screen_24bit_to_16bit_color(uint8_t r, uint8_t g, uint8_t b)
 {
     // Scale the values rather than bitshift to preserve brightness
     uint16_t r5 = (uint16_t)((r * 31u) / 255u);
