@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
-load("@pico-sdk//bazel:defs.bzl", "compatible_with_rp2", "pico_generate_pio_header")
+load("@pico-sdk//bazel:defs.bzl", "pico_generate_pio_header")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,19 +15,9 @@ pico_generate_pio_header(
 
 cc_binary(
     name = "holoprojector_pico_v1.elf",
-    srcs = [
-        "src/holoprojector_lights.c",
-        "src/main.c",
-        "src/pico_servo.c",
-        "src/psi_light.c",
-        "src/r2bus_receiver.c",
-        "src/r2bus_receiver.h",
-        "src/status_led.c",
-        "src/tasks.c",
-        "src/ws2812.c",
-    ],
+    srcs = glob(["src/**/*.c", "src/**/*.h", "include/**/*.h"]),
     additional_linker_inputs = ["linker.ld"],
-    copts = ["-std=c11"],
+    copts = ["-std=c11", "-Os"],
     includes = [
         "include",
         "src",  # r2bus_receiver.h lives alongside its .c
@@ -36,7 +26,10 @@ cc_binary(
         "-T$(location linker.ld)",
         "-Wl,--gc-sections",
     ],
-    target_compatible_with = compatible_with_rp2(),
+    target_compatible_with = select({
+        "@pico-sdk//bazel/constraint:host": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":pico_servo_pio",
         ":ws2812_pio",

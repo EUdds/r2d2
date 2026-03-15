@@ -17,7 +17,7 @@ void screen_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, 
 void screen_write_rect_panel(uint8_t panel, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *pixels);
 uint8_t screen_num_panels(void);
 
-inline uint16_t screen_24bit_to_16bit_color(uint8_t r, uint8_t g, uint8_t b)
+static inline uint16_t screen_24bit_to_16bit_color(uint8_t r, uint8_t g, uint8_t b)
 {
     // Scale the values rather than bitshift to preserve brightness
     uint16_t r5 = (uint16_t)((r * 31u) / 255u);
