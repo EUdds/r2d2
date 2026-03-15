@@ -62,6 +62,37 @@ static const uint32_t matrix_colors[] = {0x0000FF, 0xFFFFFF, 0x000000}; // Blue,
 
 static uint32_t led_matrix_colors[LED_MATRIX_ROWS][LED_MATRIX_COLS] = {0};
 
+// ---------------------------------------------------------------------------
+// Dirty region tracking (in screen / pixel-buffer coordinate space).
+//
+// Rather than blitting the full 320x206 buffer on every 100Hz tick, we track
+// the bounding box of pixels that were actually modified.  Only that region is
+// sent over SPI, saving ~98% of the pixel data on a typical animation step
+// (one 21x21 LED circle vs. 320x206 full frame).
+// ---------------------------------------------------------------------------
+static bool     s_has_dirty = false;
+static uint16_t s_dirty_x1  = SCREEN_WIDTH;
+static uint16_t s_dirty_y1  = SCREEN_HEIGHT;
+static uint16_t s_dirty_x2  = 0u;
+static uint16_t s_dirty_y2  = 0u;
+
+static void dirty_reset(void)
+{
+    s_has_dirty = false;
+    s_dirty_x1  = SCREEN_WIDTH;
+    s_dirty_y1  = SCREEN_HEIGHT;
+    s_dirty_x2  = 0u;
+    s_dirty_y2  = 0u;
+}
+
+static void dirty_include(uint16_t x, uint16_t y)
+{
+    if (x < s_dirty_x1) { s_dirty_x1 = x; }
+    if (x > s_dirty_x2) { s_dirty_x2 = x; }
+    if (y < s_dirty_y1) { s_dirty_y1 = y; }
+    if (y > s_dirty_y2) { s_dirty_y2 = y; }
+    s_has_dirty = true;
+}
 
 static void logic_lights_set_pixel_color(uint16_t x, uint16_t y, uint16_t color)
 {
@@ -104,6 +135,7 @@ static void logic_lights_set_pixel_color(uint16_t x, uint16_t y, uint16_t color)
         return;
     }
 
+    dirty_include(x, y);
     pixelBuffer[y][x] = color;
 }
 
@@ -143,10 +175,10 @@ static void logic_lights_draw_led(int32_t x, int32_t y, uint8_t radius, uint8_t 
         }
     }
 }
+
 /**
-* @breif Fill the screen with a matrix of LEDs
-*
- */
+* @brief Fill the screen with a matrix of LEDs
+*/
 static void logic_lights_create_led_matrix(uint8_t rows, uint8_t cols, uint8_t spacing, uint8_t radius, uint32_t* colors)
 {
     if (rows == 0 || cols == 0)
@@ -179,39 +211,21 @@ static void logic_lights_create_led_matrix(uint8_t rows, uint8_t cols, uint8_t s
     }
 }
 
-static void logic_lights_create_debug_grid(void)
+/**
+* @brief Redraw a single LED at (row, col) using its current color from led_matrix_colors.
+*        Marks the affected screen region dirty.  Only call when the color has actually
+*        changed — avoids redrawing the full matrix for a one-LED update.
+*/
+static void logic_lights_redraw_led(uint8_t row, uint8_t col)
 {
-    const uint16_t grid_spacing = 20;
-    const uint16_t vertical_axis_color = screen_24bit_to_16bit_color(255, 0, 0); // Red border
-    const uint16_t vertical_line_color = screen_24bit_to_16bit_color(0, 255, 0); // Green lines
-    const uint16_t horizontal_axis_color = screen_24bit_to_16bit_color(0, 0, 255); // Blue axis
-    const uint16_t horizontal_line_color = screen_24bit_to_16bit_color(255, 255, 0); // Yellow lines
-    // Draw vertical lines
-    for (uint16_t x = 0; x < SCREEN_WIDTH; x += grid_spacing)
-    {
-        for (uint16_t y = 0; y < SCREEN_HEIGHT; y++)
-        {
-            if (x == 0 || y == 0 )
-            {
-                logic_lights_set_pixel_color(x, y, vertical_axis_color);
-                continue;
-            }
-            logic_lights_set_pixel_color(x, y, vertical_line_color);
-        }
-    }
-    // Draw horizontal lines
-    for (uint16_t y = 0; y < SCREEN_HEIGHT; y += grid_spacing)
-    {
-        for (uint16_t x = 0; x < SCREEN_WIDTH; x++)
-        {
-            if (x == 0 || y == 0 )
-            {
-                logic_lights_set_pixel_color(x, y, horizontal_axis_color);
-                continue;
-            }
-            logic_lights_set_pixel_color(x, y, horizontal_line_color);
-        }
-    }
+    const int16_t padding = 10;
+    int32_t x = (int32_t)(padding + LED_RADIUS) + (int32_t)col * (LED_MATRIX_SPACING + LED_RADIUS * 2);
+    int32_t y = (int32_t)(padding + LED_RADIUS) + (int32_t)row * (LED_MATRIX_SPACING + LED_RADIUS * 2);
+    uint32_t color32 = led_matrix_colors[row][col];
+    uint8_t r = (uint8_t)((color32 >> 16) & 0xFF);
+    uint8_t g = (uint8_t)((color32 >> 8) & 0xFF);
+    uint8_t b = (uint8_t)(color32 & 0xFF);
+    logic_lights_draw_led(x, y, LED_RADIUS, r, g, b);
 }
 
 static void logic_lights_write_led_color(uint8_t row, uint8_t col, uint32_t color)
@@ -266,7 +280,7 @@ void logic_lights_init(void)
             led_matrix_colors[row][col] = init_color;
         }
     }
-    logic_lights_create_led_matrix(LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_SPACING, LED_RADIUS, led_matrix_colors); // Create a 5x8 matrix of red LEDs
+    logic_lights_create_led_matrix(LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_SPACING, LED_RADIUS, led_matrix_colors);
 }
 
 void logic_lights_run_animation_step(void)
@@ -282,14 +296,27 @@ void logic_lights_run_animation_step(void)
         if (logic_lights_select_weighted_color(&color))
         {
             logic_lights_write_led_color(row, col, color);
-            logic_lights_create_led_matrix(LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_SPACING, LED_RADIUS, (uint32_t*)led_matrix_colors);
+            logic_lights_redraw_led(row, col); // Redraw only the changed LED
         }
         animation_step_counter = 0;
     }
 }
 
-
 void logic_lights_update_screen(void)
 {
-    screen_write_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (const uint16_t*)pixelBuffer);
+    if (!s_has_dirty)
+    {
+        return;
+    }
+
+    // Blit only the dirty bounding box, one row at a time.  Each row of
+    // pixelBuffer is contiguous in memory so we can pass a pointer directly
+    // into the buffer without copying.
+    uint16_t w = s_dirty_x2 - s_dirty_x1 + 1u;
+    for (uint16_t y = s_dirty_y1; y <= s_dirty_y2; y++)
+    {
+        screen_write_rect(s_dirty_x1, y, w, 1u, &pixelBuffer[y][s_dirty_x1]);
+    }
+
+    dirty_reset();
 }
