@@ -20,10 +20,7 @@ cc_binary(
         "-Wl,--gc-sections",
     ],
     local_defines = ["PCB_REV=1"],
-    target_compatible_with = select({
-        "@pico-sdk//bazel/constraint:host": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
     deps = [
         "//firmware/libs/r2bus",
         "//firmware/libs/st7789",
