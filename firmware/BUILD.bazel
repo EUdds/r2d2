@@ -4,13 +4,13 @@
 package(default_visibility = ["//visibility:public"])
 
 alias(
-    name = "front_logic",
-    actual = "//firmware/front_logic:front_logic_v1.elf",
+    name = "front_logic_v1",
+    actual = "//firmware/front_logic:front_logic/1",
 )
 
 alias(
     name = "front_logic_v2",
-    actual = "//firmware/front_logic:front_logic_v2.elf",
+    actual = "//firmware/front_logic:front_logic/2",
 )
 
 alias(

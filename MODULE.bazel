@@ -4,6 +4,7 @@ pico_libfixmath = use_extension("//:extensions.bzl", "local_vendor")
 use_repo(pico_libfixmath, "pico_libfixmath")
 bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "pico-sdk", version = "2.2.1-develop.bcr.20250915-8fcd44a1")
+bazel_dep(name = "picotool", version = "2.2.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "nanopb", version = "0.4.9")
 

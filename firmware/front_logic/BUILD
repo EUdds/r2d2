@@ -1,9 +1,9 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//firmware:defs.bzl", "pico_binary")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_binary(
-    name = "front_logic_v2.elf",
+pico_binary(
+    name = "front_logic/2/elf",
     srcs = [
         "src/can_receiver.c",
         "src/logic_lights.c",
@@ -30,8 +30,8 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "front_logic_v1.elf",
+pico_binary(
+    name = "front_logic/1/elf",
     srcs = [
         "src/logic_lights.c",
         "src/main.c",
