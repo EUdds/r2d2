@@ -36,8 +36,8 @@ build_firmware() {
         --aspects @pico-sdk//tools:uf2_aspect.bzl%pico_uf2_aspect \
         --output_groups=+pico_uf2_files
 
-    find bazel-bin/firmware -name "*.uf2" -exec cp {} "$out_dir/" \;
-    find bazel-bin/firmware -name "*.elf" -exec cp {} "$out_dir/" \;
+    find bazel-bin/firmware -type f -name "*.uf2" -exec install -m 644 {} "$out_dir/" \;
+    find bazel-bin/firmware -type f -name "*.elf" -exec install -m 644 {} "$out_dir/" \;
 
     echo "Firmware artifacts in $out_dir:"
     ls "$out_dir"
