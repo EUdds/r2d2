@@ -4,7 +4,14 @@ package(default_visibility = ["//visibility:public"])
 
 cc_binary(
     name = "front_logic_v1.elf",
-    srcs = glob(["src/**/*.c", "include/**/*.h"]),
+    srcs = [
+        "src/logic_lights.c",
+        "src/main.c",
+        "src/r2bus_receiver.c",
+        "src/screen.c",
+        "src/status_led.c",
+        "src/tasks.c",
+    ] + glob(["include/**/*.h"]),
     additional_linker_inputs = ["linker.ld"],
     copts = ["-std=c11", "-Os"],
     includes = ["include"],
@@ -19,6 +26,7 @@ cc_binary(
     }),
     deps = [
         "//firmware/libs/r2bus",
+        "//firmware/libs/st7789",
         "@pico-sdk//src/rp2_common/hardware_dma",
         "@pico-sdk//src/rp2_common/hardware_pio",
         "@pico-sdk//src/rp2_common/hardware_pwm",
