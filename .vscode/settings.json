@@ -1,6 +1,19 @@
 {
-    "cmake.sourceDirectory": "/home/eric/ros2_ws/holoprojector",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}",
+        "--background-index",
+        "--clang-tidy",
+        "--header-insertion=never",
+        "--completion-style=detailed",
+        "--function-arg-placeholders=true",
+        "--fallback-style=LLVM"
+    ],
+    "clangd.path": "clangd",
     "files.associations": {
-        "random": "cpp"
-    }
+        "*.h": "c",
+        "*.c": "c"
+    },
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "editor.formatOnSave": false,
+    "cmake.sourceDirectory": "/home/eric/r2d2/dome_ctlr"
 }

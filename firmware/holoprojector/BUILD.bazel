@@ -1,0 +1,41 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@pico-sdk//bazel:defs.bzl", "pico_generate_pio_header")
+
+package(default_visibility = ["//visibility:public"])
+
+pico_generate_pio_header(
+    name = "ws2812_pio",
+    srcs = ["src/ws2812.pio"],
+)
+
+pico_generate_pio_header(
+    name = "pico_servo_pio",
+    srcs = ["src/pico_servo.pio"],
+)
+
+cc_binary(
+    name = "holoprojector_pico_v1.elf",
+    srcs = glob(["src/**/*.c", "src/**/*.h", "include/**/*.h"]),
+    additional_linker_inputs = ["linker.ld"],
+    copts = ["-std=c11", "-Os"],
+    includes = [
+        "include",
+        "src",  # r2bus_receiver.h lives alongside its .c
+    ],
+    linkopts = [
+        "-T$(location linker.ld)",
+        "-Wl,--gc-sections",
+    ],
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+    deps = [
+        ":pico_servo_pio",
+        ":ws2812_pio",
+        "@pico_libfixmath//:fixmath",
+        "//firmware/libs/r2bus",
+        "@pico-sdk//src/rp2_common/hardware_dma",
+        "@pico-sdk//src/rp2_common/hardware_pio",
+        "@pico-sdk//src/rp2_common/hardware_pwm",
+        "@pico-sdk//src/rp2_common/pico_stdio_usb",
+        "@pico-sdk//src/rp2_common/pico_stdlib",
+    ],
+)

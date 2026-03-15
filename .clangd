@@ -1,0 +1,21 @@
+CompileFlags:
+  # Use the compile_commands.json from the repo root
+  CompilationDatabase: .
+
+# Diagnostics configuration
+Diagnostics:
+  ClangTidy:
+    Add:
+      - bugprone-*
+      - performance-*
+    Remove:
+      - modernize-use-trailing-return-type
+  UnusedIncludes: Strict
+
+# Index configuration for better performance
+Index:
+  Background: Build
+
+# Completion configuration
+Completion:
+  AllScopes: Yes

@@ -1,0 +1,59 @@
+#! /bin/bash
+
+set -e
+
+usage() {
+    echo "Usage: r2-dev <target>"
+    echo ""
+    echo "Targets:"
+    echo "  dome_motor   Build and install dome motor package"
+    echo "  firmware     Build all firmware (platforms are baked into targets)"
+    echo "  all          Build everything"
+    echo ""
+    echo "Examples:"
+    echo "  ./r2-dev dome_motor"
+    echo "  ./r2-dev firmware"
+    echo "  ./r2-dev all"
+}
+
+build_dome_motor() {
+    bazel build //dome_motor:dome_motor_install
+    set +e
+    sudo apt install -y --reinstall "$(pwd)/bazel-bin/dome_motor/dome-motor_0.1.0_all.deb"
+    set -e
+    echo "Dome motor package installed."
+}
+
+build_firmware() {
+    local out_dir
+    out_dir="$(dirname "$0")/out"
+    mkdir -p "$out_dir"
+
+    bazel build //firmware:all
+
+    find bazel-bin/firmware -type f -name "*.uf2" -exec install -m 644 {} "$out_dir/" \;
+    find bazel-bin/firmware -type f -name "*.elf" -exec install -m 644 {} "$out_dir/" \;
+    find bazel-bin/firmware -type f -name "*.hex" -exec install -m 644 {} "$out_dir/" \;
+
+    echo "Firmware artifacts in $out_dir:"
+    ls "$out_dir"
+}
+
+TARGET=${1:-}
+
+case "$TARGET" in
+    dome_motor)
+        build_dome_motor
+        ;;
+    firmware)
+        build_firmware
+        ;;
+    all)
+        build_dome_motor
+        build_firmware
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

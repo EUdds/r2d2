@@ -1,0 +1,18 @@
+package(default_visibility = ["//visibility:public"])
+
+# Target platforms to make cross-build invocations shorter and reusable.
+platform(
+    name = "arm64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+platform(
+    name = "amd64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)

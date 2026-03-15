@@ -1,0 +1,31 @@
+FROM ros:jazzy
+
+# Arguments for user/group IDs
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ARG USERNAME=eric-dev
+
+# Create user with matching UID/GID
+RUN groupadd -g ${GROUP_ID} ${USERNAME} && \
+    useradd -l -u ${USER_ID} -g ${USERNAME} -m -s /bin/bash ${USERNAME} && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install development tools
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-colcon-common-extensions \
+    ros-jazzy-rmw-cyclonedds-cpp \
+    vim \
+    git \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch to user
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}/ros2_ws
+
+# Source ROS 2 on container startup
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/${USERNAME}/.bashrc && \
+    echo "if [ -f /home/${USERNAME}/ros2_ws/install/setup.bash ]; then source /home/${USERNAME}/ros2_ws/install/setup.bash; fi" >> /home/${USERNAME}/.bashrc
+
+CMD ["/bin/bash"]

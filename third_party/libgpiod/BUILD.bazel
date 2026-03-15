@@ -1,0 +1,20 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_import(
+    name = "gpiod_arm64",
+    hdrs = ["include/gpiod.h"],
+    shared_library = "lib/libgpiod.so",
+    includes = ["include"],
+    system_provided = False,
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+cc_library(
+    name = "gpiod_arm64_lib",
+    hdrs = ["include/gpiod.h"],
+    includes = ["include"],
+    deps = [":gpiod_arm64"],
+)

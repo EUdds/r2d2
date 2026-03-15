@@ -1,0 +1,28 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# r2bus.pb.c / r2bus.pb.h are committed pre-generated files produced by:
+#   python3 firmware/libs/nanopb/generator/nanopb_generator.py \
+#       proto/r2bus.proto -I proto --output-dir .
+# Re-run whenever proto/r2bus.proto changes and commit the results.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "r2bus",
+    srcs = [
+        "src/r2bus.c",
+        "src/r2bus.pb.c",
+        "src/r2bus_transmitter.c",
+        "src/rs485.c",
+    ],
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    target_compatible_with = select({
+        "@pico-sdk//bazel/constraint:host": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@nanopb//:nanopb",
+        "@pico-sdk//src/rp2_common/pico_stdlib",
+    ],
+)

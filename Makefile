@@ -1,4 +1,4 @@
-PACKAGES := gateway holoprojector remote interfaces
+PACKAGES := gateway holoprojector remote interfaces joystick_ctrl
 
 PROTO_SRC := holoprojector/proto/holoprojector.proto
 PROTO_OUT_C := holoprojector/firmware/holoprojector/holoprojector.pb.c

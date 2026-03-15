@@ -1,0 +1,27 @@
+# WORKSPACE.bazel - legacy-style repo declarations for submodules that
+# do not have their own MODULE.bazel.
+#
+# MODULE.bazel is the primary build system; this file exists only to
+# expose submodule directories as named Bazel repositories.
+
+workspace(name = "r2d2")
+
+load("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+# pico-libfixmath is a pico-targeted fixed-point math library.
+# The library itself is pure C with no platform dependencies.
+new_local_repository(
+    name = "pico_libfixmath",
+    path = "firmware/libs/pico-libfixmath",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "fixmath",
+    srcs = glob(["src/*.c"]),
+    hdrs = glob(["include/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+""",
+)

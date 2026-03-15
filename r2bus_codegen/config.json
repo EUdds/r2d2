@@ -1,0 +1,27 @@
+{
+  "tx_queue_size": 16,
+  "0x10": {
+    "Ping": 0,
+    "Pong": 0,
+    "Heartbeat": 0,
+    "PsiColorRequest": 0,
+    "ServoMoveCommand": 0,
+    "ServoHomeCommand": 0,
+    "HoloColorRequest": 0,
+    "HoloPositionRequest": 0,
+    "PsiMoodRequest": 0,
+    "Empty": 0
+  },
+  "0x11": {
+    "Ping": 0,
+    "Pong": 0,
+    "Heartbeat": 0,
+    "PsiColorRequest": 0,
+    "ServoMoveCommand": 0,
+    "ServoHomeCommand": 0,
+    "HoloColorRequest": 0,
+    "HoloPositionRequest": 0,
+    "PsiMoodRequest": 0,
+    "Empty": 0
+  }
+}

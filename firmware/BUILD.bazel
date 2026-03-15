@@ -1,0 +1,38 @@
+# Top-level firmware aggregator.
+# Build everything: bazel build //firmware:all
+load("//firmware:defs.bzl", "platform_firmware")
+
+package(default_visibility = ["//visibility:public"])
+
+platform_firmware(
+    name = "front_logic_v1",
+    targets = ["//firmware/front_logic:front_logic/1"],
+    platform = "@pico-sdk//bazel/platform:rp2040",
+)
+
+platform_firmware(
+    name = "front_logic_v2",
+    targets = ["//firmware/front_logic:front_logic/2"],
+    platform = "@pico-sdk//bazel/platform:rp2350",
+)
+
+platform_firmware(
+    name = "holoprojector",
+    targets = ["//firmware/holoprojector:holoprojector_pico_v1.elf"],
+    platform = "@pico-sdk//bazel/platform:rp2040",
+)
+
+filegroup(
+    name = "gen1",
+    srcs = [
+        ":front_logic_v1",
+        ":holoprojector",
+    ],
+)
+
+filegroup(
+    name = "gen2",
+    srcs = [
+        ":front_logic_v2",
+    ],
+)
