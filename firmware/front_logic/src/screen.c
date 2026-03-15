@@ -148,10 +148,34 @@ void screen_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, 
         return;
     }
 #if PCB_REV >= 2
-    for (uint8_t i = 0u; i < 2u; i++) {
+    for (uint8_t i = 0u; i < NUMBER_OF_SCREENS; i++) {
         st7789_write_rect(&s_panels[i], x, y, width, height, pixels);
     }
 #else
     st7789_write_rect(&s_display, x, y, width, height, pixels);
+#endif
+}
+
+void screen_write_rect_panel(uint8_t panel, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *pixels)
+{
+    if (pixels == NULL || !screen_validate_bounds(x, y, width, height)) {
+        return;
+    }
+#if PCB_REV >= 2
+    if (panel < NUMBER_OF_SCREENS) {
+        st7789_write_rect(&s_panels[panel], x, y, width, height, pixels);
+    }
+#else
+    (void)panel;
+    st7789_write_rect(&s_display, x, y, width, height, pixels);
+#endif
+}
+
+uint8_t screen_num_panels(void)
+{
+#if PCB_REV >= 2
+    return NUMBER_OF_SCREENS;
+#else
+    return 1u;
 #endif
 }
