@@ -1,0 +1,14 @@
+# Top-level firmware aggregator target.
+# Build all firmware ELFs for rp2040:
+#   bazel build //firmware:all --platforms=@pico-sdk//bazel/platform:rp2040
+package(default_visibility = ["//visibility:public"])
+
+alias(
+    name = "front_logic",
+    actual = "//firmware/front_logic:front_logic_v1.elf",
+)
+
+alias(
+    name = "holoprojector",
+    actual = "//firmware/holoprojector:holoprojector_pico_v1.elf",
+)
