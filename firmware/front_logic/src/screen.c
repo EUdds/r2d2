@@ -24,7 +24,7 @@
 #define SCREEN0_X_OFFSET        0u
 #endif
 #ifndef SCREEN0_Y_OFFSET
-#define SCREEN0_Y_OFFSET        8u
+#define SCREEN0_Y_OFFSET        10u
 #endif
 #ifndef SCREEN1_X_OFFSET
 #define SCREEN1_X_OFFSET        0u
