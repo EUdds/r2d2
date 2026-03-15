@@ -21,3 +21,18 @@ platform_firmware(
     targets = ["//firmware/holoprojector:holoprojector_pico_v1.elf"],
     platform = "@pico-sdk//bazel/platform:rp2040",
 )
+
+filegroup(
+    name = "gen1",
+    srcs = [
+        ":front_logic_v1",
+        ":holoprojector",
+    ],
+)
+
+filegroup(
+    name = "gen2",
+    srcs = [
+        ":front_logic_v2",
+    ],
+)
