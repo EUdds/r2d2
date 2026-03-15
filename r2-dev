@@ -1,24 +1,63 @@
 #! /bin/bash
 
 set -e
-bazel build //dome_motor:dome_motor_install
-sudo apt install -y --reinstall $(pwd)/bazel-bin/dome_motor/dome-motor_0.1.0_all.deb
-set +e
 
-echo "Dome motor package installed."
+usage() {
+    echo "Usage: r2-dev <target> [options]"
+    echo ""
+    echo "Targets:"
+    echo "  dome_motor          Build and install dome motor package"
+    echo "  firmware [platform] Build all firmware (platform: rp2040 [default] | rp2350)"
+    echo "  all [platform]      Build everything"
+    echo ""
+    echo "Examples:"
+    echo "  ./r2-dev dome_motor"
+    echo "  ./r2-dev firmware"
+    echo "  ./r2-dev firmware rp2350"
+    echo "  ./r2-dev all"
+}
 
-PLATFORM=${1:-rp2040}
-OUT_DIR="$(dirname "$0")/out"
+build_dome_motor() {
+    bazel build //dome_motor:dome_motor_install
+    set +e
+    sudo apt install -y --reinstall "$(pwd)/bazel-bin/dome_motor/dome-motor_0.1.0_all.deb"
+    set -e
+    echo "Dome motor package installed."
+}
 
-mkdir -p "$OUT_DIR"
+build_firmware() {
+    local platform=${1:-rp2040}
+    local out_dir
+    out_dir="$(dirname "$0")/out"
+    mkdir -p "$out_dir"
 
-bazel build //firmware:all \
-  --platforms=@pico-sdk//bazel/platform:"$PLATFORM" \
-  --aspects @pico-sdk//tools:uf2_aspect.bzl%pico_uf2_aspect \
-  --output_groups=+pico_uf2_files
+    bazel build //firmware:all \
+        --platforms=@pico-sdk//bazel/platform:"$platform" \
+        --aspects @pico-sdk//tools:uf2_aspect.bzl%pico_uf2_aspect \
+        --output_groups=+pico_uf2_files
 
-find bazel-bin/firmware -name "*.uf2" -exec cp {} "$OUT_DIR/" \;
-find bazel-bin/firmware -name "*.elf" -exec cp {} "$OUT_DIR/" \;
+    find bazel-bin/firmware -name "*.uf2" -exec cp {} "$out_dir/" \;
+    find bazel-bin/firmware -name "*.elf" -exec cp {} "$out_dir/" \;
 
-echo "Firmware artifacts in $OUT_DIR:"
-ls "$OUT_DIR"
+    echo "Firmware artifacts in $out_dir:"
+    ls "$out_dir"
+}
+
+TARGET=${1:-}
+
+case "$TARGET" in
+    dome_motor)
+        build_dome_motor
+        ;;
+    firmware)
+        build_firmware "${2:-rp2040}"
+        ;;
+    all)
+        build_dome_motor
+        build_firmware "${2:-rp2040}"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
